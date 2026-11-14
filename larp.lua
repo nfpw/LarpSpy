@@ -1,3 +1,4 @@
+local __R = {}
 --[[
 	some part of the code mine but mostly made with claude opus 5.5/sonnet 5.5 thanks to that
 	sorry for bad code
@@ -20,8 +21,8 @@
 ]]
 
 local folder = "LarpSpy"
-local font_url = "https://raw.githubusercontent.com/nfpw/LarpSpy/refs/heads/main/assets/Monaco.ttf"
-local icon_base = "https://raw.githubusercontent.com/nfpw/LarpSpy/main/assets/"
+__R.font_url = "https://raw.githubusercontent.com/nfpw/LarpSpy/refs/heads/main/assets/Monaco.ttf"
+__R.icon_base = "https://raw.githubusercontent.com/nfpw/LarpSpy/main/assets/"
 local X = { }
 local UI = { }
 
@@ -79,7 +80,7 @@ local players = clone_ref(game.GetService(game, "Players"))
 local user_input_service = clone_ref(game.GetService(game, "UserInputService"))
 local run_service = clone_ref(game.GetService(game, "RunService"))
 local http_service = clone_ref(game.GetService(game, "HttpService"))
-local TweenService = clone_ref(game.GetService(game, "TweenService"))
+__R.TweenService = clone_ref(game.GetService(game, "TweenService"))
 local core_gui = clone_ref(game.GetService(game, "CoreGui"))
 UI.log_service = clone_ref(game.GetService(game, "LogService"))
 UI.own_callbacks = setmetatable({ }, {__mode = "k"})
@@ -429,7 +430,7 @@ UI.accent_presets = {
 	{"Red", rgb(255, 100, 100)},
 }
 
-local function preset_color(Name)
+do local function preset_color(Name)
 	for _, preset in UI.accent_presets do
 		if preset[1] == Name then
 			return preset[2]
@@ -457,7 +458,7 @@ function UI.accent_color()
 	end
 
 	return preset_color(Settings.Accent)
-end
+end end
 
 UI.themes = {
 	Midnight = {Background = rgb(15, 16, 21), Border = rgb(38, 41, 52), Inline = rgb(22, 24, 31), Hover = rgb(44, 48, 62), Page = rgb(19, 21, 27), Outline = rgb(40, 44, 56), Element = rgb(32, 35, 45), Text = rgb(232, 234, 240), Dim = rgb(151, 153, 160), Bad = rgb(235, 90, 90)},
@@ -486,7 +487,7 @@ UI.crash_wants = function()
 	return UI.crash_detect() or next(UI.crash.ArgBlocks) ~= nil
 end
 
-local function kind_of(class, Method, object)
+function __R.kind_of(class, Method, object)
 	if Method == "FireServer" or Method == "fireServer" then
 		if class == "RemoteEvent" then
 			return (Settings.Events or Settings.BlockEvents or UI.crash_wants()) and "event"
@@ -606,7 +607,7 @@ function UI.core_state_info(Method, a1, a2)
 	return false, false
 end
 
-local function allow(check, Self)
+function __R.allow(check, Self)
 	if not check then
 		return true
 	end
@@ -682,7 +683,7 @@ shared.Methods = methods
 UI.core_gui_names = {"Backpack", "Health", "All", "PlayerList", "EmotesMenu"}
 UI.capture_busy = setmetatable({ }, {__mode = "k"})
 
-local function capture(...)
+function __R.capture(...)
 	local thread = coroutine.running()
 	if UI.capture_busy[thread] then
 		return false
@@ -780,7 +781,7 @@ if not shared.Installed.Namecall then
 			if shared.Methods[Method] and typeof(self) == "Instance" then
 				local check = UI.strict[Method]
 				if not check or check(self) then
-					local block, replace, fake = capture(self, Method, false, select(2, ...))
+					local block, replace, fake = __R.capture(self, Method, false, select(2, ...))
 					if setnamecallmethod and not env.__LarpUseOth then
 						setnamecallmethod(Method)
 					end
@@ -841,11 +842,11 @@ local function hook_direct(key, getter, Method)
 		local check = UI.strict[Method]
 		local old
 		old = X.hook_function(original, X.new_c_closure(function(self, ...)
-			if not allow(check, self) then
+			if not __R.allow(check, self) then
 				return old(self, ...)
 			end
 
-			local block, replace, fake = capture(self, Method, true, ...)
+			local block, replace, fake = __R.capture(self, Method, true, ...)
 			if block then
 				return fake
 			end
@@ -886,7 +887,7 @@ if Settings.CoreState or Settings.BlockCoreState then
 end
 
 local create_busy = false
-local connect_methods = {Connect = true, connect = true, Once = true, once = true, ConnectParallel = true, connectParallel = true}
+__R.connect_methods = {Connect = true, connect = true, Once = true, once = true, ConnectParallel = true, connectParallel = true}
 
 UI.install_create = function()
 for _, pair in {{buffer, "buffer"}, {table, "table"}} do
@@ -1006,7 +1007,7 @@ local function install_require()
 	return ok
 end
 
-local function hook_signal_function(Name, Function)
+function __R.hook_signal_function(Name, Function)
 	if not X.hook_function or type(Function) ~= "function" or shared.Installed[Name] then
 		return
 	end
@@ -1026,7 +1027,7 @@ local function hook_signal_function(Name, Function)
 	end)
 end
 
-local function install_connections()
+function __R.install_connections()
 	local errors = { }
 	local probe = Instance.new("BindableEvent")
 	local signal = probe.Event
@@ -1040,7 +1041,7 @@ local function install_connections()
 
 		local Hook = X.new_c_closure(function(Self, ...)
 			local Method = X.get_namecall_method()
-			if shared.ConnectionsOn and connect_methods[Method] then
+			if shared.ConnectionsOn and __R.connect_methods[Method] then
 				local captured, block = pcall(shared.capture_connect, Method, Self, ...)
 				if setnamecallmethod then
 					setnamecallmethod(Method)
@@ -1237,8 +1238,8 @@ if Settings.DebugCalls then
 	install_debug_info()
 end
 
-hook_signal_function("firesignal", X.FireSignal)
-hook_signal_function("replicatesignal", X.ReplicateSignal)
+__R.hook_signal_function("firesignal", X.FireSignal)
+__R.hook_signal_function("replicatesignal", X.ReplicateSignal)
 if X.fire_proximity and X.hook_function and not shared.Installed.FireProximity then
 	pcall(function()
 		local old
@@ -1290,14 +1291,14 @@ local ignore_patterns = { }
 local channel = nil
 local only_patterns = { }
 local ignored_names = { }
-local dyn_code = {
+__R.dyn_code = {
 	server = "workspace.GetServerTimeNow(workspace)",
 	tick = "tick()",
 	time = "os.time()",
 	ms = "DateTime.now().UnixTimestampMillis",
 }
 
-local function parse_ignore()
+function __R.parse_ignore()
 	ignore_patterns = { }
 	for piece in string.gmatch(Settings.IgnoreNames, "[^,]+") do
 		piece = string.match(piece, "^%s*(.-)%s*$")
@@ -1307,7 +1308,7 @@ local function parse_ignore()
 	end
 end
 
-local function parse_only()
+function __R.parse_only()
 	only_patterns = { }
 	for piece in string.gmatch(Settings.OnlyNames, "[^,]+") do
 		piece = string.match(piece, "^%s*(.-)%s*$")
@@ -1394,7 +1395,7 @@ UI.stack_raw = function(raw)
 	end
 end
 
-local function caller_info()
+function __R.caller_info()
 	local raw = UI.stack_raw(raw_debug_info or debug.info)
 	local ok_own, own = true, raw(1, "s")
 	local first
@@ -1679,16 +1680,16 @@ end
 
 shared.LibBlocked = blocked
 shared.LibBlockAll = { }
-parse_ignore()
-parse_only()
-local dyn_kinds = {
+__R.parse_ignore()
+__R.parse_only()
+__R.dyn_kinds = {
 	{"server", function() return workspace.GetServerTimeNow(workspace) end, 2},
 	{"tick", function() return tick() end, 2},
 	{"time", function() return os.time() end, 2},
 	{"ms", function() return DateTime.now().UnixTimestampMillis end, 2000},
 }
 
-local function detect_dynamic(args, count)
+function __R.detect_dynamic(args, count)
 	if not Settings.AutoFill then
 		return nil
 	end
@@ -1698,7 +1699,7 @@ local function detect_dynamic(args, count)
 		local Value = args[index]
 		if type(Value) == "number" and Value == Value and Value > 1e9 then
 			local best, best_diff = nil, nil
-			for _, kind in dyn_kinds do
+			for _, kind in __R.dyn_kinds do
 				local ok, Now = pcall(kind[2])
 				if ok and type(Now) == "number" then
 					local diff = math.abs(Now - Value)
@@ -1722,7 +1723,7 @@ UI.up_seen = setmetatable({ }, {__mode = "k"})
 UI.actor_by_script = setmetatable({ }, {__mode = "k"})
 local replaying = false
 local click_fired = setmetatable({ }, {__mode = "k"})
-local prompt_fired = setmetatable({ }, {__mode = "k"})
+__R.prompt_fired = setmetatable({ }, {__mode = "k"})
 
 local function push(remote, Method, kind, script, Actor, count, ...)
 	if Actor == nil and kind ~= "incoming" then
@@ -1751,7 +1752,7 @@ local function push(remote, Method, kind, script, Actor, count, ...)
 		args[index] = deep_copy(args[index])
 	end
 
-	args.Dyn = detect_dynamic(args, count)
+	args.Dyn = __R.detect_dynamic(args, count)
 	if Settings.UpvalueSearch and kind ~= "http" and kind ~= "lib" and kind ~= "wait" and kind ~= "logservice" then
 		local ok_up, up = pcall(UI.find_upvalues, args, count)
 		args.Up = ok_up and up or nil
@@ -1793,7 +1794,7 @@ local function push(remote, Method, kind, script, Actor, count, ...)
 		Method = Method,
 		Kind = kind,
 		Script = script,
-		Info = Settings.DebugInfo and caller_info() or nil,
+		Info = Settings.DebugInfo and __R.caller_info() or nil,
 		Actor = Actor,
 		Args = args,
 		Count = count,
@@ -1973,7 +1974,7 @@ UI.capture_lib_body = function(Name, ...)
 	push(Name, Name, "lib", script, nil, count, table.unpack(args, 1, count))
 end
 
-local function debug_spoof(Mode)
+do local function debug_spoof(Mode)
 	if Mode == "true" then
 		return table.pack(true)
 	elseif Mode == "false" then
@@ -2133,7 +2134,7 @@ shared.Capture = function(self, Method, direct, ...)
 		return false
 	end
 
-	local kind = kind_of(self.ClassName, Method, self)
+	local kind = __R.kind_of(self.ClassName, Method, self)
 	if not kind then
 		return false
 	end
@@ -2784,7 +2785,7 @@ shared.capture_debug_info = function(results, ...)
 	local spoof
 	pcall(function()
 		local script = X.get_calling_script()
-		local Info = caller_info()
+		local Info = __R.caller_info()
 		local ok_name, script_name = pcall(function() return script.Name end)
 		local ok_path, script_path = pcall(function() return script.GetFullName(script) end)
 		local where = (ok_name and script_name) or (Info and string.match(tostring(Info.Source), "[^%.]+$")) or "unknown"
@@ -2830,7 +2831,7 @@ shared.capture_debug_info = function(results, ...)
 
 	shared.DebugInside = false
 	return spoof
-end
+end end
 
 shared.capture_signal = function(Name, signal, ...)
 	if not active or replaying then
@@ -2914,7 +2915,7 @@ shared.capture_proximity = function(Prompt, ...)
 		return false
 	end
 
-	prompt_fired[Prompt] = os.clock()
+	__R.prompt_fired[Prompt] = os.clock()
 	if Settings.Prompts and not paused and not ignored[Prompt] and not name_ignored(Prompt.Name) then
 		push(Prompt, "fireproximityprompt", "prompt", X.get_calling_script(), nil, select("#", ...), ...)
 	end
@@ -2985,16 +2986,16 @@ shared.capture_exec = function(kind, Name, target, ...)
 	return blocked[target] == true or blocked_names[target.Name] == true or (kind == "touch" and Settings.BlockTouchCalls == true) or (kind == "click" and Settings.BlockClickCalls == true)
 end
 
-local connections = { }
+__R.connections = { }
 local kind_icons = { }
-local Accented = { }
+__R.Accented = { }
 local pending_status
 local destroy
 local minimized = false
 
 local function Connect(signal, callback)
 	local Connection = signal.Connect(signal, callback)
-	table.insert(connections, Connection)
+	table.insert(__R.connections, Connection)
 	return Connection
 end
 
@@ -3035,7 +3036,7 @@ function UI.base64(Data)
 	return table.concat(out)
 end
 
-local function draw_title()
+function __R.draw_title()
 	UI.title_text.Text = '<font color="' .. hex.Accent .. '">Larp</font> Spy'
 end
 
@@ -3046,7 +3047,7 @@ local font_face, font_size, pixel = (function()
 		local ttf = folder .. "/Monaco.ttf"
 		local json = folder .. "/Monaco.json"
 		if not isfile(ttf) then
-			writefile(ttf, assert(http_get(font_url)))
+			writefile(ttf, assert(http_get(__R.font_url)))
 		end
 
 		writefile(json, http_service.JSONEncode(http_service, {name = "Monaco", faces = {{name = "Regular", weight = 400, style = "Regular", assetId = getcustomasset(ttf)}}}))
@@ -3085,7 +3086,7 @@ do
 
 		local path = folder .. "/icons/ui_check.png"
 		if not isfile(path) then
-			local Data = http_get((string.gsub(font_url, "[^/]+$", "")) .. "Check.png")
+			local Data = http_get((string.gsub(__R.font_url, "[^/]+$", "")) .. "Check.png")
 			if type(Data) == "string" and #Data > 50 and string.sub(Data, 2, 4) == "PNG" then
 				writefile(path, Data)
 			end
@@ -3108,7 +3109,7 @@ do
 		for _, Name in {"event", "unreliable", "function", "bindable", "incoming", "require", "kick", "teleport", "firesignal", "replicatesignal", "debuginfo", "prompt", "touch", "click", "connection", "guiclick", "tool", "actormsg", "create", "corestate", "shutdown", "parentnil", "http", "arrow", "lib", "logservice", "loghistory", "getattr", "setattr", "sound", "wait", "anim", "instancenew", "tables", "buffers", "actors", "block", "settings", "code", "logs", "misc", "appearance"} do
 			local path = folder .. "/icons/v2_" .. Name .. ".png"
 			if not isfile(path) then
-				local ok, Data = pcall(http_get, icon_base .. Name .. ".png")
+				local ok, Data = pcall(http_get, __R.icon_base .. Name .. ".png")
 				if ok and type(Data) == "string" and #Data > 50 and string.sub(Data, 2, 4) == "PNG" then
 					writefile(path, Data)
 				end
@@ -3156,7 +3157,7 @@ UI.check_rows = UI.check_rows or { }
 UI.duals = UI.duals or { }
 UI.classic_only = UI.classic_only or { }
 local Lib = (UI.assets or assert(loadstring(assert(http_get("https://raw.githubusercontent.com/nfpw/LarpSpy/main/uiassets.lua"), "couldn't download uiassets.lua"), "uiassets"))())({
-	t = T, ui = UI, connect = Connect, tween_service = TweenService, accented = Accented,
+	t = T, ui = UI, connect = Connect, tween_service = __R.TweenService, accented = __R.Accented,
 	font = function() return font_face, font_size, pixel end,
 	bold = function() return UI.bold_face end,
 })
@@ -3190,7 +3191,7 @@ UI.only(Accent(New("Frame", {Parent = main, Size = UDim2.new(1, 0, 0, 1), Border
 UI.only(Glow(main, 20, 0.55))
 UI.title_bar = New("Frame", {Parent = main, Size = UDim2.new(1, 0, 0, UI.classic and 24 or 34), BackgroundTransparency = 1, Active = true})
 UI.title_text = Text(UI.title_bar, {Position = UDim2.new(0, 8, 0, 0), Size = UDim2.new(0, 130, 1, 0), RichText = true, TextSize = UI.classic and font_size or 15, FontFace = UI.bold_face})
-draw_title()
+__R.draw_title()
 local tabs = New("Frame", {Parent = UI.title_bar, Position = UDim2.new(0, UI.classic and 140 or 120, 0, UI.classic and 4 or 6), Size = UDim2.new(0, 520, 0, UI.classic and 16 or 22), BackgroundTransparency = 1})
 HorizontalList(tabs, 4)
 local status = Text(UI.title_bar, {AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, UI.classic and -52 or -66, 0, 0), Size = UDim2.new(0, 280, 1, 0), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = T.Dim, Text = hook_status})
@@ -3310,7 +3311,7 @@ end
 
 local quote_map = {["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t", ['"'] = '\\"', ["\\"] = "\\\\"}
 
-local function over(object)
+function __R.over(object)
 	local mouse = user_input_service.GetMouseLocation(user_input_service)
 	local position, size = object.AbsolutePosition, object.AbsoluteSize
 	return mouse.X >= position.X and mouse.X <= position.X + size.X and mouse.Y >= position.Y and mouse.Y <= position.Y + size.Y
@@ -3691,7 +3692,7 @@ local function open_menu(options, width, anchor)
 end
 
 Connect(user_input_service.InputBegan, function(input_object)
-	if menu.Visible and (input_object.UserInputType == Enum.UserInputType.MouseButton1 or input_object.UserInputType == Enum.UserInputType.MouseButton2) and not over(menu) then
+	if menu.Visible and (input_object.UserInputType == Enum.UserInputType.MouseButton1 or input_object.UserInputType == Enum.UserInputType.MouseButton2) and not __R.over(menu) then
 		close_menu()
 	end
 end)
@@ -3738,7 +3739,7 @@ UI.rename_comment = function(Log)
 	return lines
 end
 
-local function serialize_table(Value, depth, seen, context)
+function __R.serialize_table(Value, depth, seen, context)
 	if seen[Value] then
 		return "{} --[[ cycle ]]"
 	end
@@ -3863,7 +3864,7 @@ local function display_name(Log)
 	return Log.Dup and (Name .. " " .. Log.Dup) or Name
 end
 
-local function dup_tag(remote)
+function __R.dup_tag(remote)
 	local ok, tag = pcall(function()
 		local Name, Parent = remote.Name, remote.Parent
 		local same, mine = 0, 0
@@ -3882,7 +3883,7 @@ local function dup_tag(remote)
 	return ok and tag or nil
 end
 
-local function display_class(Log)
+function __R.display_class(Log)
 	if Log.Kind == "http" then
 		return Log.Executor and "http (executor)" or "http (game)"
 	end
@@ -3940,8 +3941,8 @@ end
 
 local function arg_code(Log, index, depth, context)
 	local dyn = Settings.AutoFill and Log.Args.Dyn
-	if dyn and dyn[index] and dyn_code[dyn[index]] then
-		return dyn_code[dyn[index]]
+	if dyn and dyn[index] and __R.dyn_code[dyn[index]] then
+		return __R.dyn_code[dyn[index]]
 	end
 
 	return serialize(Log.Args[index], depth, nil, context)
@@ -3957,7 +3958,7 @@ local function resolve(Log)
 	local copy = { }
 	for index = 1, Log.Count do
 		copy[index] = args[index]
-		for _, kind in dyn_kinds do
+		for _, kind in __R.dyn_kinds do
 			if dyn[index] == kind[1] then
 				local ok, Now = pcall(kind[2])
 				if ok then
@@ -5149,7 +5150,7 @@ UI.buffer_notes = function(Log)
 	return lines
 end
 
-local function generate_raw(Log)
+function __R.generate_raw(Log)
 	if Log.Kind == "http" then
 		local lines = {"-- generated by Larp Spy"}
 		if Log.Executor then
@@ -5811,7 +5812,7 @@ end]=],
 	return table.concat(header, "\n") .. "\n\n" .. inner
 end
 
-local function strip_comments(code)
+function __R.strip_comments(code)
 	local out, length, index = { }, #code, 1
 	local line_start = 1
 	local function only_space()
@@ -5883,14 +5884,14 @@ local function strip_comments(code)
 end
 
 local function generate(Log)
-	local code = generate_raw(Log)
+	local code = __R.generate_raw(Log)
 	if not Settings.StripComments then
 		return code
 	end
 
 	local head = string.sub(code, 1, #banner) == banner
 	local body = head and string.sub(code, #banner + 1) or code
-	local stripped = string.gsub(string.gsub(strip_comments((head and "\n" or "") .. body), "\n\n\n+", "\n\n"), "^\n+", "")
+	local stripped = string.gsub(string.gsub(__R.strip_comments((head and "\n" or "") .. body), "\n\n\n+", "\n\n"), "^\n+", "")
 	return (head and (banner .. "\n\n") or "") .. stripped
 end
 
@@ -6017,7 +6018,7 @@ serialize = function(Value, depth, seen, context)
 	elseif Type == "string" then
 		return quote(Value)
 	elseif Type == "table" then
-		return serialize_table(Value, depth, seen, context)
+		return __R.serialize_table(Value, depth, seen, context)
 	elseif Type == "Instance" then
 		return path_of(Value, context)
 	elseif Type == "Vector3" then
@@ -6134,7 +6135,7 @@ local function layout()
 	UI.splitter.Position = UDim2.new(Split, -4, 0, 6)
 end
 
-local function matches(Log)
+function __R.matches(Log)
 	if filter == "" then
 		return true
 	end
@@ -6326,7 +6327,7 @@ local function viewed(Log)
 	}
 end
 
-local function Decompile(script)
+function __R.Decompile(script)
 	local native = (getgenv and getgenv().decompile) or decompile or (syn and syn.decompile)
 	local problem = nil
 	if type(native) == "function" then
@@ -6368,7 +6369,7 @@ function UI.pop_in(frame)
 	UI.Smooth(frame, {Position = UDim2.new(0, 6, 0, 6)}, 0.35)
 end
 
-local function parse_value(raw)
+function __R.parse_value(raw)
 	local Lower = string.lower(raw)
 	if Lower == "true" then
 		return true
@@ -6403,7 +6404,7 @@ local function parse_value(raw)
 	return tonumber(raw) or raw
 end
 
-local function show_value(Value)
+function __R.show_value(Value)
 	if type(Value) == "string" then
 		return '"' .. Value .. '"'
 	elseif type(Value) == "table" then
@@ -6476,7 +6477,7 @@ local row_height = UI.classic and 18 or 22
 rebuild = function()
 	flat = { }
 	for _, Log in logs do
-		if matches(Log) then
+		if __R.matches(Log) then
 			table.insert(flat, Log)
 		end
 	end
@@ -6485,7 +6486,7 @@ rebuild = function()
 	render()
 end
 
-local function get_row(index)
+do local function get_row(index)
 	if pool[index] then
 		return pool[index]
 	end
@@ -6606,7 +6607,7 @@ render = function()
 		row.BackgroundColor3 = is_selected and T.Element or T.Hover
 		row.BackgroundTransparency = is_selected and 0 or (row.GetAttribute(row, "Hovered") and 0.5 or 1)
 	end
-end
+end end
 
 Connect(tree.GetPropertyChangedSignal(tree, "CanvasPosition"), function() render() end)
 Connect(tree.GetPropertyChangedSignal(tree, "AbsoluteWindowSize"), function() render() end)
@@ -6728,7 +6729,7 @@ local function decompile_caller(script)
 	show_source("source  " .. name_of(script) .. "  (decompiling...)", "-- decompiling " .. path .. "...")
 	set_status("decompiling " .. name_of(script) .. "...")
 	task.spawn(function()
-		local success, result = Decompile(script)
+		local success, result = __R.Decompile(script)
 		if success then
 			result = string.gsub(string.gsub(result, "\r\n", "\n"), "\t", "    ")
 			UI.source_cache[script] = result
@@ -6861,7 +6862,7 @@ New("UIPadding", {Parent = UI.hook_scroll, PaddingTop = UDim.new(0, 4), PaddingL
 UI.hook_remote = nil
 UI.hook_boxes = { }
 
-local function apply_hook()
+do local function apply_hook()
 	local remote = UI.hook_remote
 	if not remote then
 		return
@@ -6871,7 +6872,7 @@ local function apply_hook()
 	for index, box in UI.hook_boxes do
 		local raw = string.match(box.Text, "^%s*(.-)%s*$")
 		if raw ~= "" then
-			spec[index] = {Value = parse_value(raw)}
+			spec[index] = {Value = __R.parse_value(raw)}
 		end
 	end
 
@@ -6882,7 +6883,7 @@ local function apply_hook()
 	set_status(overrides[remote] and ("hooked arguments of " .. name_of(remote)) or "argument hook removed")
 end
 
-Button(UI.hook_bar, "apply", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X}, apply_hook)
+Button(UI.hook_bar, "apply", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X}, apply_hook) end
 Button(UI.hook_bar, "remove", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 1}, function()
 	if UI.hook_remote then
 		overrides[UI.hook_remote] = nil
@@ -6896,7 +6897,7 @@ end)
 
 Button(UI.hook_bar, "close", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2}, function() hook_panel.Visible = false end)
 
-local function open_hook(Log)
+function __R.open_hook(Log)
 	local remote = Log.Remote
 	local hookable = Log.Kind == "event" or Log.Kind == "unreliable" or Log.Kind == "function" or Log.Kind == "bindable"
 	if typeof(remote) ~= "Instance" or not hookable then
@@ -6931,7 +6932,7 @@ local function open_hook(Log)
 		Text(row, {Size = UDim2.new(0.55, -6, 1, 0), Text = "[" .. index .. "] " .. shown})
 		local box = Input(row, {AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0.45, 0, 1, 0)}, "override")
 		if current[index] then
-			box.Text = show_value(current[index].Value)
+			box.Text = __R.show_value(current[index].Value)
 		end
 
 		UI.hook_boxes[index] = box
@@ -6978,7 +6979,7 @@ UI.rule_matches = function(rule, total, ...)
 	return true
 end
 
-local block_panel = Panel(UI.logs_view, "ignore arguments")
+do local block_panel = Panel(UI.logs_view, "ignore arguments")
 block_panel.Visible = false
 block_panel.Active = true
 block_panel.ZIndex = 10
@@ -7083,7 +7084,7 @@ Button(UI.block_bar, "clear rules", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize
 	block_panel.Visible = false
 end)
 
-Button(UI.block_bar, "close", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2}, function() block_panel.Visible = false end)
+Button(UI.block_bar, "close", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2}, function() block_panel.Visible = false end) end
 local binds = { }
 local binding_log = nil
 local binding_loop = false
@@ -7567,7 +7568,7 @@ UI.set_ignored_name = function(Name, Bool)
 	rebuild()
 end
 
-local function latest_call(row)
+do local function latest_call(row)
 	local picked = row.ViewIndex
 	row.ViewIndex = nil
 	local latest = viewed(row)
@@ -7624,7 +7625,7 @@ UI.set_loop = function(Log, Bool)
 	if selected == Log then
 		UI.refresh_loop(Log)
 	end
-end
+end end
 
 UI.export_logs = function()
 	if not writefile then
@@ -7649,7 +7650,7 @@ UI.export_logs = function()
 	set_status(ok and ("exported " .. #logs .. " logs to " .. Name) or ("export failed: " .. tostring(Error)))
 end
 
-local function view_call(index)
+do local function view_call(index)
 	if not selected or not selected.History then
 		return
 	end
@@ -7660,7 +7661,7 @@ local function view_call(index)
 	show_details(selected)
 end
 
-local function current_index()
+do local function current_index()
 	return selected and (selected.ViewIndex or #selected.History) or 1
 end
 
@@ -7986,7 +7987,7 @@ Button(UI.history_row, "history", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize =
 	end
 
 	open_menu(options, 220)
-end)
+end) end end
 
 UI.history_label = Text(UI.history_row, {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, TextColor3 = T.Dim, LayoutOrder = 4})
 
@@ -7998,7 +7999,7 @@ log_menu = function(Log)
 		{"Copy hooked arguments code", function() UI.copy_hook_code(Log, true) end},
 		{"Copy oth.hook code", function() UI.copy_oth_hook(Log) end},
 		{"Run again", function() replay(viewed(Log)) end},
-		{overrides[Log.Remote] and "Edit argument hook" or "Hook arguments", function() open_hook(Log) end, T.Accent},
+		{overrides[Log.Remote] and "Edit argument hook" or "Hook arguments", function() __R.open_hook(Log) end, T.Accent},
 		{Log.BindKey and ("Remove bind (" .. Log.BindKey .. ")") or "Bind run to key", function()
 			if Log.BindKey then
 				remove_bind(Log)
@@ -8132,7 +8133,7 @@ show_details = function(Log, keep_scroll)
 
 	local kind_tint = kind_color(Log.Kind)
 	local color = "#" .. kind_tint.ToHex(kind_tint)
-	UI.info_name.Text = Esc(display_name(Log)) .. ' <font color="' .. hex.Dim .. '">' .. Esc(display_class(Log)) .. '</font>  <font color="' .. color .. '">' .. kinds[Log.Kind].Tag .. "</font>"
+	UI.info_name.Text = Esc(display_name(Log)) .. ' <font color="' .. hex.Dim .. '">' .. Esc(__R.display_class(Log)) .. '</font>  <font color="' .. color .. '">' .. kinds[Log.Kind].Tag .. "</font>"
 	local ok_path, path = pcall(display_path, Log)
 	UI.info_path.Text = ok_path and path or ""
 	if Log.Signal and not Log.OwnerSearched then
@@ -8212,7 +8213,7 @@ end
 show_details(nil)
 UI.incoming_connections = { }
 
-local function watch_incoming(remote)
+do local function watch_incoming(remote)
 	if UI.incoming_connections[remote] or self_ignore[remote] then
 		return
 	end
@@ -8229,7 +8230,7 @@ local function watch_incoming(remote)
 	end)
 end
 
-local function set_incoming(Bool)
+do local function set_incoming(Bool)
 	if Bool then
 		local ok, all = pcall(game.GetDescendants, game)
 		for _, object in ok and all or { } do
@@ -8951,7 +8952,7 @@ do
 				return
 			end
 
-			if os.clock() - (prompt_fired[Prompt] or 0) < 0.3 or ignored[Prompt] or name_ignored(Prompt.Name) then
+			if os.clock() - (__R.prompt_fired[Prompt] or 0) < 0.3 or ignored[Prompt] or name_ignored(Prompt.Name) then
 				return
 			end
 
@@ -9151,10 +9152,10 @@ task.spawn(function()
 end)
 
 UI.upvalue = {On = false, Hooked = { }, Watched = { }, Polling = false}
-local prompt_original = setmetatable({ }, {__mode = "k"})
-local auto_shown = setmetatable({ }, {__mode = "k"})
+do local prompt_original = setmetatable({ }, {__mode = "k"})
+do local auto_shown = setmetatable({ }, {__mode = "k"})
 
-local function make_instant(Prompt)
+do local function make_instant(Prompt)
 	if not Prompt.IsA(Prompt, "ProximityPrompt") then
 		return
 	end
@@ -9166,7 +9167,7 @@ local function make_instant(Prompt)
 	Prompt.HoldDuration = 0
 end
 
-local function set_instant_prompts(Bool)
+do local function set_instant_prompts(Bool)
 	if not Bool then
 		for Prompt, hold in prompt_original do
 			pcall(function() Prompt.HoldDuration = hold end)
@@ -9175,7 +9176,7 @@ local function set_instant_prompts(Bool)
 	end
 end
 
-local function auto_fire(Prompt)
+do local function auto_fire(Prompt)
 	if auto_shown[Prompt] then
 		return
 	end
@@ -9288,7 +9289,7 @@ do
 			auto_shown[Prompt] = nil
 		end)
 	end
-end
+end end
 
 UI.watch_specs = { }
 UI.watch_marks = setmetatable({ }, {__mode = "k"})
@@ -9302,7 +9303,7 @@ end)
 if #UI.watch_specs > 0 then
 	task.spawn(UI.scan_watch)
 end
-local actor_source = [==[
+do local actor_source = [==[
 local Channel = %CHANNEL%
 if not Channel then
 	return
@@ -9463,13 +9464,13 @@ Old = hookmetamethod(game, "__namecall", Close(function(self, ...)
 	return Old(self, ...)
 end))
 ]==]
-local injected = { }
+do local injected = { }
 
-local function actor_settings()
+do local function actor_settings()
 	return {Events = Settings.Events, Functions = Settings.Functions, Unreliable = Settings.Unreliable, Bindables = Settings.Bindables, ActorMessages = Settings.ActorMessages, Tools = Settings.Tools, Executor = Settings.Executor}
 end
 
-local function setup_channel()
+do local function setup_channel()
 	if channel then
 		return true
 	end
@@ -9517,7 +9518,7 @@ local function setup_channel()
 			return
 		end
 
-		local kind2 = kind_of(class_of(remote), Method)
+		local kind2 = __R.kind_of(class_of(remote), Method)
 		if kind2 then
 			push(remote, Method, kind2, script, label, count or select("#", ...), ...)
 		end
@@ -9526,7 +9527,7 @@ local function setup_channel()
 	return true
 end
 
-local function actor_targets()
+do local function actor_targets()
 	local targets = { }
 	if X.get_actors and X.RunOnActor then
 		local ok, list = pcall(X.get_actors)
@@ -9543,13 +9544,13 @@ local function actor_targets()
 	return targets
 end
 
-local function update_actor_info()
+do local function update_actor_info()
 	if UI.actor_info then
 		UI.actor_info.Text = UI.actor_status
 	end
 end
 
-local function inject_actors(force)
+do local function inject_actors(force)
 	if not Settings.Actors then
 		UI.actor_status = "off"
 		update_actor_info()
@@ -9619,11 +9620,11 @@ UI.settings_scroll = New("ScrollingFrame", {
 })
 
 UI.titles = UI.titles or { }
-local columns = { }
-local section_order = 0
-local set_accent
+do local columns = { }
+do local section_order = 0
+do local set_accent
 
-local function section(side, title)
+do local function section(side, title)
 	section_order += 1
 	local frame = New("Frame", {Parent = columns[side], LayoutOrder = section_order, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.Inline, BorderSizePixel = UI.classic and 2 or 0, BorderColor3 = T.Outline})
 	UI.Dual(Stroke(frame), "Border", "Outline")
@@ -9667,7 +9668,7 @@ UI.apply_game_only = function(Bool)
 	end
 end
 
-local function changed(key)
+do local function changed(key)
 	if key == "GameOnly" then
 		UI.apply_game_only(Settings.GameOnly)
 		return
@@ -9679,7 +9680,7 @@ local function changed(key)
 	end
 end
 
-local function check(content, label, key, on_change)
+do local function check(content, label, key, on_change)
 	local row = New("TextButton", {Parent = content, Size = UDim2.new(1, 0, 0, UI.classic and 16 or 18), BackgroundTransparency = 1, Text = "", AutoButtonColor = false})
 	local box = New("Frame", {Parent = row, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.new(0, 14, 0, 14), BackgroundColor3 = T.Element, BorderSizePixel = 0})
 	local box_stroke = Stroke(box, T.Outline)
@@ -9746,7 +9747,7 @@ local function check(content, label, key, on_change)
 	end)
 end
 
-local function choice(content, label, key, options, on_change)
+do local function choice(content, label, key, options, on_change)
 	local row = New("Frame", {Parent = content, Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1})
 	Text(row, {Size = UDim2.new(0.5, 0, 0, 18), Text = label})
 	local open, hovering = false, false
@@ -9941,7 +9942,7 @@ UI.multi_choice = function(content, label, key, options, empty_text, on_change)
 	table.insert(UI.check_draws, refresh)
 end
 
-local function field(content, label, key, placeholder, parse, on_change)
+do local function field(content, label, key, placeholder, parse, on_change)
 	local row = New("Frame", {Parent = content, Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1})
 	Text(row, {Size = UDim2.new(0.5, 0, 1, 0), Text = label})
 	local box = Input(row, {AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0.5, 0, 1, 0)}, placeholder)
@@ -9966,7 +9967,7 @@ local function field(content, label, key, placeholder, parse, on_change)
 	end)
 end
 
-local function action(content, label, callback)
+do local function action(content, label, callback)
 	Button(content, label, {Size = UDim2.new(1, 0, 0, 18)}, callback)
 end
 
@@ -10013,7 +10014,7 @@ UI.net_report = function()
 	set_status("network finder: " .. (ok and path or best.Caller.Name) .. " (" .. best.Entry.Count .. " modules), top 5 copied")
 end
 
-local function Info(content, String)
+do local function Info(content, String)
 	return Text(content, {Size = UDim2.new(1, 0, 0, 12), TextColor3 = T.Dim, Text = String, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y, TextTruncate = Enum.TextTruncate.None})
 end
 
@@ -10727,9 +10728,9 @@ end
 
 	do
 	local ignoring = section(5, "ignore")
-	field(ignoring, "Ignore names", "IgnoreNames", "ping, ^Mouse", nil, parse_ignore)
+	field(ignoring, "Ignore names", "IgnoreNames", "ping, ^Mouse", nil, __R.parse_ignore)
 	Info(ignoring, "Comma separated Lua patterns, matched against remote names.")
-	field(ignoring, "Only log names", "OnlyNames", "Damage, ^Shop", nil, parse_only)
+	field(ignoring, "Only log names", "OnlyNames", "Damage, ^Shop", nil, __R.parse_only)
 	Info(ignoring, "Whitelist: when set, only matching remotes are logged.")
 	action(ignoring, "unignore all names", function()
 		for Name in ignored_names do
@@ -11181,11 +11182,11 @@ end
 	end
 
 	UI.build_misc()
-end)()
+end)() end end end end end end end
 
 set_accent = function()
 	UI.apply_colors()
-end
+end end end end
 
 function UI.apply_colors()
 	local Next = table.clone(UI.themes[UI.theme_for(Settings.Theme)])
@@ -11241,7 +11242,7 @@ function UI.apply_colors()
 		pcall(function() pair[1].Color = T[UI.classic and pair[2] or pair[3]] end)
 	end
 
-	for _, pair in Accented do
+	for _, pair in __R.Accented do
 		pcall(function() pair[1][pair[2]] = T.Accent end)
 	end
 
@@ -11249,7 +11250,7 @@ function UI.apply_colors()
 		pcall(draw)
 	end
 
-	draw_title()
+	__R.draw_title()
 	render()
 	if selected then
 		show_details(selected)
@@ -11258,7 +11259,7 @@ end
 
 UI.tab_buttons = { }
 
-local function show_tab(Name)
+do local function show_tab(Name)
 	local previous = UI.current_tab
 	if UI.key_capture_cancel then
 		UI.key_capture_cancel()
@@ -11498,7 +11499,7 @@ do
 				else
 					if typeof(Log.Remote) == "Instance" and Log.Kind ~= "debuginfo" and not Log.Signal then
 						UI.track_remote(Log.Remote)
-						Log.Dup = dup_tag(Log.Remote)
+						Log.Dup = __R.dup_tag(Log.Remote)
 					end
 
 					Log.History = {{Args = Log.Args, Count = Log.Count, Script = Log.Script, Info = Log.Info, Time = Log.Time, number = 1, Result = Log.Result, Signal = Log.Signal}}
@@ -11701,7 +11702,7 @@ end
 UI.sync_connections = function()
 	local on = Settings.Connections or Settings.LogReaders or Settings.BlockLogReaders
 	shared.ConnectionsOn = on == true
-	if on and not install_connections() then
+	if on and not __R.install_connections() then
 		set_status("couldn't hook Connect: " .. tostring(shared.ConnectError))
 		return false
 	end
@@ -12092,7 +12093,7 @@ destroy = function()
 
 	set_incoming(false)
 	pcall(set_instant_prompts, false)
-	for _, Connection in connections do
+	for _, Connection in __R.connections do
 		pcall(function() Connection.Disconnect(Connection) end)
 	end
 
@@ -12213,7 +12214,7 @@ UI.start_all_hooks = function()
 	try("require", install_require)
 	try("debug.info (game)", install_debug_info)
 	try("http", UI.install_http)
-	try("connections", install_connections)
+	try("connections", __R.install_connections)
 	try("table / buffer", UI.set_lib)
 	try("Instance.new", UI.set_instance_new)
 	try("task.wait", UI.set_wait)
@@ -12229,4 +12230,4 @@ end
 
 local hook_failures = { }
 set_status((hook_status == "hooked" and "logging" or hook_status) .. (UI.adonis_status and ("  |  " .. UI.adonis_status) or "") .. (UI.hook_note and ("  |  " .. UI.hook_note) or "") .. (env.__LarpOthError and ("  |  oth.hook failed once: " .. string.sub(env.__LarpOthError, 1, 60)) or "") .. (#hook_failures > 0 and ("  |  hooks failed: " .. table.concat(hook_failures, ", ")) or "  |  all hooks ready"))
-end)()
+end)() end end end end end end end end end end end end end end
