@@ -628,12 +628,12 @@ UI.namecall_filter = function()
 	return UI.filter(function()
 		local names, classes = { }, { }
 		for Method in methods do
-			table.insert(names, namecall_filter.new(Method))
+			table.insert(names, NamecallFilter.new(Method))
 		end
 
 		for _, spec in {{"GetAttribute", Settings.GetAttributes or Settings.BlockGetAttributes}, {"SetAttribute", Settings.SetAttributes or Settings.BlockSetAttributes}, {"Play", Settings.Sounds or Settings.BlockSounds}} do
 			if spec[2] then
-				table.insert(names, namecall_filter.new(spec[1]))
+				table.insert(names, NamecallFilter.new(spec[1]))
 			end
 		end
 
@@ -892,7 +892,7 @@ UI.install_create = function()
 for _, pair in {{buffer, "buffer"}, {table, "table"}} do
 	local Lib, lib_name = pair[1], pair[2]
 	local create_needed = Settings.Creates or Settings.Tables or Settings.Buffers or Settings.BlockCreates or Settings.BlockTables or Settings.BlockBuffers or UI.crash_detect()
-	if create_needed and X.hook_function and not shared.Installed["Create" .. LibName] and Lib and Lib.create then
+	if create_needed and X.hook_function and not shared.Installed["Create" .. lib_name] and Lib and Lib.create then
 		pcall(function()
 			local old
 			local fresh = lib_name == "buffer" and function() return old(0) end or function() return {} end
@@ -915,7 +915,7 @@ for _, pair in {{buffer, "buffer"}, {table, "table"}} do
 				shared.BufferCreate = old
 			end
 
-			shared.Installed["Create" .. LibName] = true
+			shared.Installed["Create" .. lib_name] = true
 		end)
 	end
 end
@@ -941,7 +941,7 @@ end
 
 UI.install_lib = function(lib_name)
 	local Lib = lib_name == "buffer" and buffer or (lib_name == "table" and table or nil)
-	if shared.Installed["Lib" .. LibName] then
+	if shared.Installed["Lib" .. lib_name] then
 		return true
 	end
 
@@ -983,7 +983,7 @@ UI.install_lib = function(lib_name)
 		end
 	end
 
-	shared.Installed["Lib" .. LibName] = hooked > 0
+	shared.Installed["Lib" .. lib_name] = hooked > 0
 	return hooked > 0
 end
 
@@ -1080,13 +1080,13 @@ local function install_connections()
 				old = type(result) == "function" and result or nil
 				shared.Installed.ConnectionsNC = true
 				if not old then
-					table.insert(errors, "nc" .. Index .. ": no original returned (using __index fallback)")
+					table.insert(errors, "nc" .. index .. ": no original returned (using __index fallback)")
 				end
 
 				break
 			end
 
-			table.insert(errors, "nc" .. Index .. ": " .. tostring(result))
+			table.insert(errors, "nc" .. index .. ": " .. tostring(result))
 		end
 	end
 
@@ -1127,7 +1127,7 @@ UI.install_create()
 UI.lib_spy_uses = {insert = true, remove = true, concat = true, unpack = true, sort = true, find = true, clear = true, clone = true, pack = true, move = true, freeze = true, isfrozen = true, getn = true, maxn = true}
 if Settings.Http or Settings.BlockHttp then
 for http_method, http_class in {HttpGet = "DataModel", HttpGetAsync = "DataModel", HttpPost = "DataModel", HttpPostAsync = "DataModel", RequestAsync = "HttpService"} do
-	hook_direct("Http" .. HttpMethod, function()
+	hook_direct("Http" .. http_method, function()
 		return (http_class == "DataModel" and game or http_service)[http_method]
 	end, http_method)
 end
@@ -1525,7 +1525,7 @@ UI.find_upvalues = function(args, count)
 						end
 
 						if type(field) == "string" or type(field) == "number" then
-							local path = access .. ((type(field) == "string" and string.match(field, "^[%a_][%w_]*$")) and ("." .. Field) or ("[" .. (type(field) == "string" and string.format("%q", field) or tostring(field)) .. "]"))
+							local path = access .. ((type(field) == "string" and string.match(field, "^[%a_][%w_]*$")) and ("." .. field) or ("[" .. (type(field) == "string" and string.format("%q", field) or tostring(field)) .. "]"))
 							if type(inner) == "number" or type(inner) == "string" then
 								for _, leaf in leaves do
 									if leaf.Value == inner and #leaf.Found < 6 then
@@ -1769,7 +1769,7 @@ local function push(remote, Method, kind, script, Actor, count, ...)
 				if previous then
 					local kept = { }
 					for _, found in leaf.Found do
-						if previous[found.Source .. "|" .. Found.Name .. "|" .. tostring(found.Line) .. "|" .. Found.Up .. "|" .. tostring(found.Field)] then
+						if previous[found.Source .. "|" .. found.Name .. "|" .. tostring(found.Line) .. "|" .. found.Up .. "|" .. tostring(found.Field)] then
 						table.insert(kept, found)
 						end
 					end
@@ -1780,7 +1780,7 @@ local function push(remote, Method, kind, script, Actor, count, ...)
 				end
 
 				for _, found in leaf.Found do
-					set[found.Source .. "|" .. Found.Name .. "|" .. tostring(found.Line) .. "|" .. Found.Up .. "|" .. tostring(found.Field)] = true
+					set[found.Source .. "|" .. found.Name .. "|" .. tostring(found.Line) .. "|" .. found.Up .. "|" .. tostring(found.Field)] = true
 				end
 
 				seen[leaf_key] = set
@@ -2322,7 +2322,7 @@ end
 crash.learn_root = function(kind)
 	local root = crash.root()
 	if root and not crash.BadFns[root] then
-		crash.BadFns[root] = "loops " .. Kind
+		crash.BadFns[root] = "loops " .. kind
 		crash.Dirty = true
 	end
 end
@@ -2350,7 +2350,7 @@ crash.spawn_blocked = function(Name, ...)
 	local count = (crash.SpawnCounts[key] or 0) + 1
 	crash.SpawnCounts[key] = count
 	if count >= (Settings.CrashSpawn or 200) then
-		crash.BadFns[key] = "spawned " .. Count .. "+ times in one frame"
+		crash.BadFns[key] = "spawned " .. count .. "+ times in one frame"
 		crash.Dirty = true
 		return true
 	end
@@ -2455,12 +2455,12 @@ crash.record = function(remote, dir, ...)
 end
 
 crash.announce = function(entry)
-	pcall(shared.notify, "crash code: " .. Entry.Kind .. " at " .. tostring(entry.Source) .. ":" .. tostring(entry.Line))
+	pcall(shared.notify, "crash code: " .. entry.Kind .. " at " .. tostring(entry.Source) .. ":" .. tostring(entry.Line))
 end
 
 crash.trip = function(kind, detail)
 	local source, line, func, defined = crash.where()
-	local where = source .. ":" .. Line
+	local where = source .. ":" .. line
 	local key = kind .. "|" .. where
 	local entry
 	local fresh = true
@@ -2518,7 +2518,7 @@ crash.Note = function(kind, ...)
 
 	if next(crash.BlockedCode) then
 		local source, line = crash.where()
-		if crash.BlockedCode[kind .. "|" .. Source .. ":" .. Line] then
+		if crash.BlockedCode[kind .. "|" .. source .. ":" .. line] then
 			return "kill"
 		end
 	end
@@ -2532,7 +2532,7 @@ crash.Note = function(kind, ...)
 
 	if count >= limit then
 		local source, line = crash.where()
-		local where = source .. ":" .. Line
+		local where = source .. ":" .. line
 		local own = (crash.Counts[kind .. where] or 0) + 1
 		crash.Counts[kind .. where] = own
 		if own == limit and count ~= limit then
@@ -2793,7 +2793,7 @@ shared.capture_debug_info = function(results, ...)
 		local key, label = "debug.info", nil
 		if group ~= "all" then
 			label = where
-			key = "debug.info|" .. Path
+			key = "debug.info|" .. path
 			if group == "caller" and Info then
 				label = where .. "." .. (Info.Name or "?") .. ":" .. tostring(Info.Line)
 				key = key .. "|" .. (Info.Name or "?") .. ":" .. tostring(Info.Line)
@@ -3465,7 +3465,7 @@ UI.beautify = function(remote, Log)
 		local class = UI.remote_classes[class_of(remote)]
 		UI.beauty_counts[class] = (UI.beauty_counts[class] or 0) + 1
 		local owner = Log and Log.Script and string.gsub(name_of(Log.Script), "[^%w_]", "") or ""
-		Info.Beauty = class .. "_" .. UI.beauty_counts[class] .. (owner ~= "" and ("_" .. Owner) or "")
+		Info.Beauty = class .. "_" .. UI.beauty_counts[class] .. (owner ~= "" and ("_" .. owner) or "")
 	end
 
 	if Settings.BeautifyRename and not Info.Overwritten then
@@ -3558,7 +3558,7 @@ local function path_of_raw(object, context)
 				if same > 1 then
 					local position = table.find(kids, child)
 					if position then
-						return ":GetChildren()[" .. Position .. "]"
+						return ":GetChildren()[" .. position .. "]"
 					end
 				end
 			end
@@ -3578,7 +3578,7 @@ local function path_of_raw(object, context)
 	end
 
 	local function append(base, child)
-		return base .. Index(child)
+		return base .. index(child)
 	end
 
 	local path, start = nil, 2
@@ -3588,7 +3588,7 @@ local function path_of_raw(object, context)
 		if first == workspace then
 			path = "workspace"
 		elseif is_service then
-			path = 'game:GetService("' .. First.ClassName .. '")'
+			path = 'game:GetService("' .. first.ClassName .. '")'
 		else
 			path = append("game", first)
 		end
@@ -3665,7 +3665,7 @@ local function open_menu(options, width, anchor)
 	end
 
 	for index, option in options do
-		local row = Text(menu, {LayoutOrder = index, Size = UDim2.new(1, 0, 0, 18), BackgroundColor3 = T.Hover, Text = "  " .. Option[1], TextColor3 = option[3] or T.Text, ZIndex = 51}, "TextButton")
+		local row = Text(menu, {LayoutOrder = index, Size = UDim2.new(1, 0, 0, 18), BackgroundColor3 = T.Hover, Text = "  " .. option[1], TextColor3 = option[3] or T.Text, ZIndex = 51}, "TextButton")
 		Connect(row.MouseEnter, function() row.BackgroundTransparency = 0.4 end)
 		Connect(row.MouseLeave, function() row.BackgroundTransparency = 1 end)
 		Connect(row.MouseButton1Click, function()
@@ -3726,7 +3726,7 @@ UI.rename_comment = function(Log)
 			table.insert(chain, (short(Name)))
 		end
 
-		table.insert(lines, "-- remote renamed by the game (" .. When .. ", " .. Info.Renames .. "x): " .. table.concat(chain, " -> "))
+		table.insert(lines, "-- remote renamed by the game (" .. when .. ", " .. Info.Renames .. "x): " .. table.concat(chain, " -> "))
 	else
 		table.insert(lines, "-- remote with a random looking name " .. (short(Info.Original)))
 	end
@@ -3791,7 +3791,7 @@ local function serialize_table(Value, depth, seen, context)
 			key_text = "[" .. serialize(key, depth + 1, seen, context) .. "]"
 		end
 
-		table.insert(lines, indent .. KeyText .. " = " .. serialize(Value[key], depth + 1, seen, context) .. ",")
+		table.insert(lines, indent .. key_text .. " = " .. serialize(Value[key], depth + 1, seen, context) .. ",")
 	end
 
 	seen[Value] = nil
@@ -3843,7 +3843,7 @@ local function display_name(Log)
 			line = string.sub(line, 1, 160) .. "..."
 		end
 
-		return ((Log.Method == "Warning" or Log.Method == "Error") and ("[" .. string.lower(Log.Method) .. "] ") or "") .. Line
+		return ((Log.Method == "Warning" or Log.Method == "Error") and ("[" .. string.lower(Log.Method) .. "] ") or "") .. line
 	end
 
 	if typeof(Log.Remote) ~= "Instance" then
@@ -3876,7 +3876,7 @@ local function dup_tag(remote)
 			end
 		end
 
-		return same > 1 and mine > 0 and ("#" .. Mine) or nil
+		return same > 1 and mine > 0 and ("#" .. mine) or nil
 	end)
 
 	return ok and tag or nil
@@ -4021,7 +4021,7 @@ UI.tidy = function(code)
 		table.insert(lines, "local character = lp.Character")
 	end
 
-	return table.concat(lines, "\n") .. "\n\n" .. Code
+	return table.concat(lines, "\n") .. "\n\n" .. code
 end
 
 UI.read_field = function(buf, Offset, Type, Len)
@@ -4232,7 +4232,7 @@ UI.auto_index = function()
 			return UI.auto_names[Lower] or Lower
 		end
 
-		local alias = string.match(source, "local%s+" .. Word .. "%s*=%s*[%w_]+%.([%a][%w]*)")
+		local alias = string.match(source, "local%s+" .. word .. "%s*=%s*[%w_]+%.([%a][%w]*)")
 		if alias then
 			return UI.auto_names[string.lower(alias)] or string.lower(alias)
 		end
@@ -4250,7 +4250,7 @@ UI.auto_index = function()
 			end
 		end
 
-		local body = string.match(source, "local%s+" .. Var .. "%s*=%s*(%b{})")
+		local body = string.match(source, "local%s+" .. var .. "%s*=%s*(%b{})")
 		if body and not string.find(string.sub(body, 2, -2), "{", 1, true) then
 			for key, expr in string.gmatch(string.sub(body, 2, -2), "([%w_]+)%s*=%s*([%w_%.]+)") do
 				add(key, expr)
@@ -4274,7 +4274,7 @@ UI.auto_index = function()
 		local fn, var = string.match(definition, "value%s*=%s*([%w_%.]+)%s*%(%s*([%w_]+)%s*%)")
 		if fn then
 			local fn_name = string.match(fn, "([%a][%w]*)$")
-			local real = fn_name == "struct" and "struct" or string.match(source, "local%s+" .. FnName .. "%s*=%s*[%w_]+%.([%a][%w]*)")
+			local real = fn_name == "struct" and "struct" or string.match(source, "local%s+" .. fn_name .. "%s*=%s*[%w_]+%.([%a][%w]*)")
 			if real == "struct" then
 				local list = table_fields(source, var)
 				if #list > 0 then
@@ -4478,7 +4478,7 @@ UI.auto_index = function()
 							end
 						end
 
-						table.insert(Info, "[" .. Index .. "]" .. type(up) .. "{" .. table.concat(keys, ",") .. "}")
+						table.insert(Info, "[" .. index .. "]" .. type(up) .. "{" .. table.concat(keys, ",") .. "}")
 					end
 
 					if type(up) == "table" then
@@ -4616,7 +4616,7 @@ UI.auto_index = function()
 
 							if Value == nil and source and not entry.Def then
 								local where = string.find(source, entry.Name, 1, true)
-								entry.SourceInfo = "(no definition of " .. Entry.Name .. " found in the decompiled source, " .. #source .. " chars" .. (where and (", first mention: " .. string.gsub(string.sub(source, math.max(1, where - 30), where + 160), "%s+", " ")) or ", name not in the source") .. ")"
+								entry.SourceInfo = "(no definition of " .. entry.Name .. " found in the decompiled source, " .. #source .. " chars" .. (where and (", first mention: " .. string.gsub(string.sub(source, math.max(1, where - 30), where + 160), "%s+", " ")) or ", name not in the source") .. ")"
 							elseif not source then
 								entry.SourceInfo = "(decompile unavailable or failed for this module)"
 							end
@@ -4663,7 +4663,7 @@ UI.auto_index = function()
 							for _, arg in entry.Args do
 								simple = simple and (UI.auto_sizes[arg[2]] ~= nil or arg[2] == "string")
 								size += UI.auto_sizes[arg[2]] or 0
-								table.insert(spec, arg[1] .. "=" .. Arg[2])
+								table.insert(spec, arg[1] .. "=" .. arg[2])
 							end
 
 							entry.Spec = simple and entry.Known and table.concat(spec, ",") or nil
@@ -4777,19 +4777,19 @@ UI.dot_syntax = function(code)
 end
 
 UI.auto_lines = function(entry, prefix)
-	local lines = {prefix .. "[" .. Entry.Name .. "] (" .. Entry.Rel .. ")  module: " .. Entry.Path}
+	local lines = {prefix .. "[" .. entry.Name .. "] (" .. entry.Rel .. ")  module: " .. entry.Path}
 	if entry.Def then
-		table.insert(lines, prefix .. "    definition: " .. Entry.Def)
+		table.insert(lines, prefix .. "    definition: " .. entry.Def)
 	elseif entry.SourceInfo then
-		table.insert(lines, prefix .. "    " .. Entry.SourceInfo)
+		table.insert(lines, prefix .. "    " .. entry.SourceInfo)
 	end
 
 	if #entry.Args == 0 then
-		table.insert(lines, prefix .. "    " .. (entry.Known and (entry.Def and not string.find(entry.Def, "value%s*=") and "(no arguments)" or entry.Def and ("definition: " .. Entry.Def) or "(no arguments)") or "(arguments unknown)"))
+		table.insert(lines, prefix .. "    " .. (entry.Known and (entry.Def and not string.find(entry.Def, "value%s*=") and "(no arguments)" or entry.Def and ("definition: " .. entry.Def) or "(no arguments)") or "(arguments unknown)"))
 	end
 
 	for _, arg in entry.Args do
-		table.insert(lines, prefix .. "    " .. Arg[1] .. ": " .. Arg[2])
+		table.insert(lines, prefix .. "    " .. arg[1] .. ": " .. arg[2])
 	end
 
 	return lines
@@ -4868,7 +4868,7 @@ UI.guess_packet = function(buf, Len, position, header)
 	end
 
 	local lines = {
-		"--   guess" .. (size and (": " .. Size .. " bytes per packet, " .. ((Len - position) // size) .. " in this buffer") or "") .. " -> " .. table.concat(shown, ", "),
+		"--   guess" .. (size and (": " .. size .. " bytes per packet, " .. ((Len - position) // size) .. " in this buffer") or "") .. " -> " .. table.concat(shown, ", "),
 		"--   try layout  " .. Id .. ":" .. table.concat(layout, ","),
 	}
 
@@ -4903,9 +4903,9 @@ UI.describe_buffer = function(buf, arg_index, reliability)
 				if Settings.PacketDump and ok_auto then
 					table.insert(lines, "--   packet dump (" .. #index.List .. " packets):")
 					for _, candidate in index.List do
-						table.insert(lines, "--     " .. Candidate.Name .. " (" .. Candidate.Rel .. ") id=" .. tostring(candidate.Id) .. " fixed=" .. tostring(candidate.Fixed) .. " raw={" .. table.concat(candidate.Raw, ",") .. "}")
+						table.insert(lines, "--     " .. candidate.Name .. " (" .. candidate.Rel .. ") id=" .. tostring(candidate.Id) .. " fixed=" .. tostring(candidate.Fixed) .. " raw={" .. table.concat(candidate.Raw, ",") .. "}")
 						for _, arg in candidate.Args do
-							table.insert(lines, "--         " .. Arg[1] .. ": " .. Arg[2])
+							table.insert(lines, "--         " .. arg[1] .. ": " .. arg[2])
 						end
 					end
 				end
@@ -4930,7 +4930,7 @@ UI.describe_buffer = function(buf, arg_index, reliability)
 						if guess_size and candidate.Fixed and candidate.Fixed + header == guess_size and count < 6 then
 							count += 1
 							if count == 1 then
-								table.insert(lines, "--   module packets with a matching size (" .. GuessSize .. " bytes, id not exposed by the module):")
+								table.insert(lines, "--   module packets with a matching size (" .. guess_size .. " bytes, id not exposed by the module):")
 							end
 
 							for _, line in UI.auto_lines(candidate, "--     ") do
@@ -4940,7 +4940,7 @@ UI.describe_buffer = function(buf, arg_index, reliability)
 					end
 
 					if count == 0 then
-						table.insert(lines, "--   " .. #index.List .. " module packets known, none matches id " .. tostring(Id) .. (guess_size and (" / size " .. GuessSize) or ""))
+						table.insert(lines, "--   " .. #index.List .. " module packets known, none matches id " .. tostring(Id) .. (guess_size and (" / size " .. guess_size) or ""))
 					end
 				end
 			end
@@ -4978,7 +4978,7 @@ UI.describe_buffer = function(buf, arg_index, reliability)
 						table.sort(keys)
 						for _, key in keys do
 							local item = Value[key] ~= nil and Value[key] or Value[tonumber(key)]
-							table.insert(lines, "--       " .. Key .. ": " .. typeof(item) .. " = " .. tostring((serialize(item, 0))))
+							table.insert(lines, "--       " .. key .. ": " .. typeof(item) .. " = " .. tostring((serialize(item, 0))))
 						end
 					else
 						table.insert(lines, "--       value: " .. typeof(Value) .. " = " .. tostring((serialize(Value, 0))))
@@ -4990,7 +4990,7 @@ UI.describe_buffer = function(buf, arg_index, reliability)
 			elseif not auto.Known then
 				table.insert(lines, "--       (argument types not found: " .. (auto.HasSource and "the packet's definition was not found in the decompiled module" or "decompile is not available or failed on the module") .. ")")
 			elseif auto.Def and not auto.Spec then
-				table.insert(lines, "--       definition: " .. Auto.Def)
+				table.insert(lines, "--       definition: " .. auto.Def)
 			end
 		end
 
@@ -4999,7 +4999,7 @@ UI.describe_buffer = function(buf, arg_index, reliability)
 		end
 
 		if Settings.ShowSchema and schema_rel then
-			table.insert(lines, "--   schema [" .. PacketName .. "] (" .. SchemaRel .. ")")
+			table.insert(lines, "--   schema [" .. packet_name .. "] (" .. schema_rel .. ")")
 			if schema_spec == "" then
 				table.insert(lines, "--       (no arguments)")
 			else
@@ -5013,7 +5013,7 @@ UI.describe_buffer = function(buf, arg_index, reliability)
 		if Settings.BufferFull then
 			table.insert(lines, "--   [" .. (packet_name or ("packet " .. tostring(Id or "?"))) .. "] (" .. (reliability or "reliable") .. (Id and (", id " .. Id) or "") .. ")")
 		else
-			table.insert(lines, "--   packet" .. (packet_name and (" " .. PacketName) or "") .. (Id and (" id " .. Id) or "") .. ":")
+			table.insert(lines, "--   packet" .. (packet_name and (" " .. packet_name) or "") .. (Id and (" id " .. Id) or "") .. ":")
 		end
 
 		local Offset, failed = position + header, false
@@ -5103,9 +5103,9 @@ UI.buffer_call = function(Log)
 		end
 
 		local Method = entry.Query and "invoke" or "send"
-		local holder = filter and ("find_packet(" .. string.format("%q", entry.Name) .. ", " .. string.format("%q", Method) .. ")") or ((entry.Query and "queries_" or "packets_") .. Mods[entry.Path] .. UI.member(entry.Name))
+		local holder = filter and ("find_packet(" .. string.format("%q", entry.Name) .. ", " .. string.format("%q", Method) .. ")") or ((entry.Query and "queries_" or "packets_") .. mods[entry.Path] .. UI.member(entry.Name))
 		local call = holder .. "." .. Method .. "(" .. Value .. ")"
-		table.insert(calls, entry.Query and ("print(" .. Call .. ")") or call)
+		table.insert(calls, entry.Query and ("print(" .. call .. ")") or call)
 	end
 
 	if position ~= Len then
@@ -5117,7 +5117,7 @@ UI.buffer_call = function(Log)
 		table.insert(out, UI.packet_helper)
 	else
 		for number, path in order do
-			table.insert(out, "local module_" .. number .. " = require(" .. Path .. ")")
+			table.insert(out, "local module_" .. number .. " = require(" .. path .. ")")
 			table.insert(out, "local packets_" .. number .. " = module_" .. number .. ".packets or module_" .. number)
 			table.insert(out, "local queries_" .. number .. " = module_" .. number .. ".queries or { }")
 		end
@@ -5168,13 +5168,13 @@ local function generate_raw(Log)
 		local arg_text = table.concat(parts, ", ")
 		local Method = Log.Method
 		if Method == "request" then
-			table.insert(lines, "local response = request(" .. ArgText .. ")\n\nprint(response.StatusCode, response.Body)")
+			table.insert(lines, "local response = request(" .. arg_text .. ")\n\nprint(response.StatusCode, response.Body)")
 		elseif Method == "RequestAsync" then
-			table.insert(lines, 'local response = game:GetService("HttpService"):RequestAsync(' .. ArgText .. ")\n\nprint(response.StatusCode, response.Body)")
+			table.insert(lines, 'local response = game:GetService("HttpService"):RequestAsync(' .. arg_text .. ")\n\nprint(response.StatusCode, response.Body)")
 		elseif string.find(Method, "^Http") then
-			table.insert(lines, "local response = game:" .. Method .. "(" .. ArgText .. ")\n\nprint(response)")
+			table.insert(lines, "local response = game:" .. Method .. "(" .. arg_text .. ")\n\nprint(response)")
 		else
-			table.insert(lines, 'local response = game:GetService("HttpService"):' .. Method .. "(" .. ArgText .. ")\n\nprint(response)")
+			table.insert(lines, 'local response = game:GetService("HttpService"):' .. Method .. "(" .. arg_text .. ")\n\nprint(response)")
 		end
 
 		return UI.tidy(table.concat(lines, "\n"))
@@ -5217,7 +5217,7 @@ local function generate_raw(Log)
 
 	if Settings.RemoteVariable and kind ~= "require" and kind ~= "debuginfo" and kind ~= "create" and kind ~= "lib" and kind ~= "wait" then
 		local variable = (kind == "kick" and "player") or (kind == "corestate" and "starterGui") or (kind == "teleport" and "teleportService") or (kind == "bindable" and "bindable") or (Log.Signal and "signal") or (kind == "prompt" and "prompt") or (kind == "touch" and "part") or (kind == "click" and "detector") or (kind == "tool" and "tool") or (kind == "actormsg" and "actor") or "remote"
-		table.insert(setup, "local " .. Variable .. " = " .. Target)
+		table.insert(setup, "local " .. variable .. " = " .. target)
 		target = variable
 	end
 
@@ -5235,8 +5235,8 @@ local function generate_raw(Log)
 		elseif Style == "variables" then
 			local names = { }
 			for index = 1, count do
-				table.insert(setup, "local arg" .. Index .. " = " .. arg_code(Log, index, 0, context))
-				table.insert(names, "arg" .. Index)
+				table.insert(setup, "local arg" .. index .. " = " .. arg_code(Log, index, 0, context))
+				table.insert(names, "arg" .. index)
 			end
 
 			arg_text = table.concat(names, ", ")
@@ -5252,7 +5252,7 @@ local function generate_raw(Log)
 				if Style == "array" then
 					table.insert(lines, "    " .. arg_code(Log, index, 1, context) .. ",")
 				elseif Value ~= nil then
-					table.insert(lines, "    [" .. Index .. "] = " .. arg_code(Log, index, 1, context) .. ",")
+					table.insert(lines, "    [" .. index .. "] = " .. arg_code(Log, index, 1, context) .. ",")
 				end
 			end
 
@@ -5262,7 +5262,7 @@ local function generate_raw(Log)
 			end
 
 			table.insert(setup, table.concat(lines, "\n"))
-			arg_text = holes and (Unpack .. "(args, 1, " .. Count .. ")") or (Unpack .. "(args)")
+			arg_text = holes and (Unpack .. "(args, 1, " .. count .. ")") or (Unpack .. "(args)")
 		end
 	end
 
@@ -5274,7 +5274,7 @@ local function generate_raw(Log)
 		local complex = false
 		local bumps, bump_vars = { }, { }
 		local function function_var(found)
-			local key = found.Source .. "|" .. Found.Name .. "|" .. tostring(found.Line)
+			local key = found.Source .. "|" .. found.Name .. "|" .. tostring(found.Line)
 			if not functions[key] then
 				local var = string.match(found.Name, "^[%a_][%w_]*$") and found.Name or "game_function"
 				if used[var] then
@@ -5392,7 +5392,7 @@ local function generate_raw(Log)
 				end
 			end
 
-			local expr = "debug.getupvalue(" .. Var .. ", " .. Found.Up .. ")"
+			local expr = "debug.getupvalue(" .. var .. ", " .. found.Up .. ")"
 			local access = ""
 			if found.Field ~= nil then
 				access = found.Field
@@ -5400,19 +5400,19 @@ local function generate_raw(Log)
 			end
 
 			if found.ToNumber then
-				expr = "tonumber(" .. Expr .. ")"
+				expr = "tonumber(" .. expr .. ")"
 			end
 
 			if found.KeyOf then
-				expr = "(next(" .. Expr .. "))"
+				expr = "(next(" .. expr .. "))"
 			end
 
 			local delta = type(current) == "number" and not found.ToNumber and step(leaf) or nil
 			if delta then
-				local bump_key = var .. "|" .. Found.Up .. "|" .. tostring(found.Field)
+				local bump_key = var .. "|" .. found.Up .. "|" .. tostring(found.Field)
 				if not bump_vars[bump_key] then
 					local base = (type(leaf.Key) == "string" and string.match(leaf.Key, "^[%a_][%w_]*$")) and leaf.Key or ("arg" .. leaf.Index)
-					bump_vars[bump_key] = "next_" .. Base
+					bump_vars[bump_key] = "next_" .. base
 					table.insert(bumps, {Var = bump_vars[bump_key], Fn = var, Up = found.Up, Access = access, Delta = delta})
 				end
 
@@ -5426,7 +5426,7 @@ local function generate_raw(Log)
 					local Text = setup[index]
 					local start, stop = string.find(Text, token, 1, true)
 					if start then
-						setup[index] = string.sub(Text, 1, start - 1) .. "[" .. Expr .. "]" .. string.sub(Text, stop + 1)
+						setup[index] = string.sub(Text, 1, start - 1) .. "[" .. expr .. "]" .. string.sub(Text, stop + 1)
 						changed = true
 						break
 					end
@@ -5450,9 +5450,9 @@ local function generate_raw(Log)
 			local tail = Settings.CodeStyle == "variables" and leaf.Key == nil and "" or ","
 			for index = setup_before + 1, #setup do
 				local Text = setup[index]
-				local start, stop = string.find(Text, prefix .. Value .. Tail, 1, true)
+				local start, stop = string.find(Text, prefix .. Value .. tail, 1, true)
 				if start then
-					setup[index] = string.sub(Text, 1, start - 1) .. Prefix .. Expr .. Tail .. Note .. string.sub(Text, stop + 1)
+					setup[index] = string.sub(Text, 1, start - 1) .. prefix .. expr .. tail .. note .. string.sub(Text, stop + 1)
 					changed = true
 					break
 				end
@@ -5498,19 +5498,19 @@ local function generate_raw(Log)
 
 			for _, key in order do
 				local entry = functions[key]
-				table.insert(head, "local " .. Entry.Var .. " = find_function(" .. string.format("%q", entry.Found.Source) .. ", " .. string.format("%q", entry.Found.Name) .. ", " .. tostring(entry.Found.Line) .. ", " .. tostring(entry.Found.Up) .. ", true) or error(" .. string.format("%q", "couldn't find " .. (entry.Found.Name ~= "" and entry.Found.Name or entry.Var) .. " (do the action in-game first)") .. ", 0)")
+				table.insert(head, "local " .. entry.Var .. " = find_function(" .. string.format("%q", entry.Found.Source) .. ", " .. string.format("%q", entry.Found.Name) .. ", " .. tostring(entry.Found.Line) .. ", " .. tostring(entry.Found.Up) .. ", true) or error(" .. string.format("%q", "couldn't find " .. (entry.Found.Name ~= "" and entry.Found.Name or entry.Var) .. " (do the action in-game first)") .. ", 0)")
 			end
 
 			if #bumps > 0 then
 				table.insert(head, "")
 				for _, bump in bumps do
 					if bump.Access ~= "" then
-						table.insert(head, "local " .. Bump.Var .. "_state = debug.getupvalue(" .. Bump.Fn .. ", " .. Bump.Up .. ")")
-						table.insert(head, "local " .. Bump.Var .. " = " .. Bump.Var .. "_state" .. Bump.Access .. " + " .. number(bump.Delta))
-						table.insert(head, bump.Var .. "_state" .. Bump.Access .. " = " .. Bump.Var .. " -- keep the game's counter in step")
+						table.insert(head, "local " .. bump.Var .. "_state = debug.getupvalue(" .. bump.Fn .. ", " .. bump.Up .. ")")
+						table.insert(head, "local " .. bump.Var .. " = " .. bump.Var .. "_state" .. bump.Access .. " + " .. number(bump.Delta))
+						table.insert(head, bump.Var .. "_state" .. bump.Access .. " = " .. bump.Var .. " -- keep the game's counter in step")
 					else
-						table.insert(head, "local " .. Bump.Var .. " = debug.getupvalue(" .. Bump.Fn .. ", " .. Bump.Up .. ") + " .. number(bump.Delta))
-						table.insert(head, "debug.setupvalue(" .. Bump.Fn .. ", " .. Bump.Up .. ", " .. Bump.Var .. ") -- keep the game's counter in step")
+						table.insert(head, "local " .. bump.Var .. " = debug.getupvalue(" .. bump.Fn .. ", " .. bump.Up .. ") + " .. number(bump.Delta))
+						table.insert(head, "debug.setupvalue(" .. bump.Fn .. ", " .. bump.Up .. ", " .. bump.Var .. ") -- keep the game's counter in step")
 					end
 				end
 			end
@@ -5551,7 +5551,7 @@ end]=],
 				table.insert(head, "local " .. Name .. " = grab_upvalue(" .. string.format("%q", entry.Found.Source) .. ", " .. tostring(entry.Found.Line) .. ", " .. tostring(entry.Found.Up) .. ")")
 				table.insert(head, "if " .. Name .. " == nil then return warn(\"not found\") end")
 				for index, Text in setup do
-					setup[index] = string.gsub(Text, "debug%.getupvalue%(" .. Entry.Var .. ", " .. tostring(entry.Found.Up) .. "%)", function() return Name end)
+					setup[index] = string.gsub(Text, "debug%.getupvalue%(" .. entry.Var .. ", " .. tostring(entry.Found.Up) .. "%)", function() return Name end)
 				end
 			end
 
@@ -5562,30 +5562,30 @@ end]=],
 
 	local call
 	if kind == "incoming" then
-		call = "firesignal(" .. Target .. ".OnClientEvent" .. (arg_text ~= "" and (", " .. ArgText) or "") .. ")"
+		call = "firesignal(" .. target .. ".OnClientEvent" .. (arg_text ~= "" and (", " .. arg_text) or "") .. ")"
 	elseif kind == "require" then
-		call = "require(" .. Target .. ")"
+		call = "require(" .. target .. ")"
 	elseif kind == "debuginfo" then
-		call = "debug.info(" .. ArgText .. ")"
+		call = "debug.info(" .. arg_text .. ")"
 	elseif kind == "create" or kind == "lib" or kind == "wait" then
-		call = target .. "(" .. ArgText .. ")"
+		call = target .. "(" .. arg_text .. ")"
 	elseif kind == "parentnil" then
 		call = target .. ".Parent = nil"
 	elseif kind == "guiclick" then
 		local lines = { }
 		for _, Name in UI.gui_signals(Log.Remote) do
-			table.insert(lines, "firesignal(" .. Target .. "." .. Name .. ")")
+			table.insert(lines, "firesignal(" .. target .. "." .. Name .. ")")
 		end
 
 		call = table.concat(lines, "\n")
 	elseif kind == "touch" or kind == "click" then
-		call = Log.Method .. "(" .. Target .. (arg_text ~= "" and (", " .. ArgText) or "") .. ")"
+		call = Log.Method .. "(" .. target .. (arg_text ~= "" and (", " .. arg_text) or "") .. ")"
 	elseif kind == "prompt" then
-		call ="fireproximityprompt(" .. Target .. (arg_text ~= "" and (", " .. ArgText) or "") .. ")"
+		call ="fireproximityprompt(" .. target .. (arg_text ~= "" and (", " .. arg_text) or "") .. ")"
 	elseif kind == "connection" then
-		call = target .. ":" .. Log.Method .. "(" .. ArgText .. ")"
+		call = target .. ":" .. Log.Method .. "(" .. arg_text .. ")"
 	elseif Log.Signal then
-		call = kind .. "(" .. Target .. (arg_text ~= "" and (", " .. ArgText) or "") .. ")"
+		call = kind .. "(" .. target .. (arg_text ~= "" and (", " .. arg_text) or "") .. ")"
 	elseif Settings.CallViaFunction and Log.Info and not Log.Actor and (kind == "event" or kind == "unreliable" or kind == "function") then
 		local with_args = Settings.CallMode == "with args"
 		local Info = with_args and Log.Info or (Log.Info.Outer or Log.Info)
@@ -5622,7 +5622,7 @@ end]=],
 		}, "\n"))
 		call = "caller_function(" .. (no_args and "" or arg_text) .. ")"
 	else
-		call = target .. ":" .. (string.gsub(Log.Method, "^%l", string.upper)) .. "(" .. ArgText .. ")"
+		call = target .. ":" .. (string.gsub(Log.Method, "^%l", string.upper)) .. "(" .. arg_text .. ")"
 	end
 
 	if kind == "getattr" and Settings.GetAttrCodeSet and count > 0 and Log.Method == "GetAttribute" then
@@ -5630,8 +5630,8 @@ end]=],
 		local number_value = number(tonumber(Settings.GetAttrNumber) or 100)
 		local string_value = string.format("%q", tostring(Settings.GetAttrString or ""))
 		call = table.concat({
-			"local instance = " .. Target,
-			"local name = " .. ArgText,
+			"local instance = " .. target,
+			"local name = " .. arg_text,
 			"local result = instance:GetAttribute(name)",
 			"print(result)",
 			"",
@@ -5662,11 +5662,11 @@ end]=],
 	elseif wrap == "spawn" then
 		body = "task.spawn(function()\n" .. indent(call) .. "\nend)"
 	elseif wrap == "pcall" then
-		body = "local ok, result = pcall(function()\n" .. indent((returns and "return " or "") .. Call) .. "\nend)\n\nprint(ok, result)"
+		body = "local ok, result = pcall(function()\n" .. indent((returns and "return " or "") .. call) .. "\nend)\n\nprint(ok, result)"
 	elseif kind == "require" then
-		body = "local module = " .. Call .. "\n\nprint(module)"
+		body = "local module = " .. call .. "\n\nprint(module)"
 	elseif returns then
-		body = "local result = " .. Call .. "\n\nprint(result)"
+		body = "local result = " .. call .. "\n\nprint(result)"
 	else
 		body = call
 	end
@@ -5720,7 +5720,7 @@ end]=],
 	elseif kind == "connection" then
 		table.insert(header, "-- the game connected a function to this signal" .. (Log.Owner and "" or " (signal owner not found, set it yourself)"))
 	elseif Log.Signal then
-		table.insert(header, "-- " .. Kind .. " call from an executor script" .. (Log.Owner and "" or " (signal owner not found, set it yourself)"))
+		table.insert(header, "-- " .. kind .. " call from an executor script" .. (Log.Owner and "" or " (signal owner not found, set it yourself)"))
 	end
 
 	local setup_text = #setup > 0 and (table.concat(setup, "\n") .. "\n\n") or ""
@@ -5738,31 +5738,31 @@ end]=],
 		returned = "\n\n-- returned:\n-- " .. (string.gsub(table.concat(parts, ", "), "\n", "\n-- "))
 	end
 
-	local inner = (context.NeedsNil and UI.get_nil_helper or "") .. (context.NeedsResolver and UI.resolver_helper or "") .. UI.tidy(setup_text .. Body .. Returned)
+	local inner = (context.NeedsNil and UI.get_nil_helper or "") .. (context.NeedsResolver and UI.resolver_helper or "") .. UI.tidy(setup_text .. body .. returned)
 	if kind == "lib" and (string.find(tostring(Log.Remote), "^require%(") or string.find(tostring(Log.Remote), "^find_packet%(")) then
 		inner = string.gsub(inner, "(%[\"[%w_]*[Tt]ime[%w_]*\"%]%s*=%s*)%-?%d[%d%.eE%+%-]*", "%1workspace:GetServerTimeNow()")
 		inner = string.gsub(inner, "([%w_]*[Tt]ime[%w_]*%s*=%s*)%-?%d[%d%.eE%+%-]*", "%1workspace:GetServerTimeNow()")
 		inner = UI.dot_syntax(inner)
 		if string.find(tostring(Log.Remote), "^find_packet%(") then
-			inner = UI.packet_helper .. "\n\n" .. Inner
+			inner = UI.packet_helper .. "\n\n" .. inner
 		end
 	end
 
 	if actor_thread then
 		local level = "=="
-		while string.find(inner, "]" .. Level .. "]", 1, true) do
+		while string.find(inner, "]" .. level .. "]", 1, true) do
 			level ..= "="
 		end
 
 		inner = table.concat({
-			"local thread_index = " .. ActorThread .. " -- getactorthreads()[thread_index]: if the egg code runs in another actor, change it",
+			"local thread_index = " .. actor_thread .. " -- getactorthreads()[thread_index]: if the egg code runs in another actor, change it",
 			"",
 			"local id, channel = create_comm_channel()",
 			"channel.Event:Connect(function(...)",
 			"    print(...)",
 			"end)",
 			"",
-			"local code = [" .. Level .. "[",
+			"local code = [" .. level .. "[",
 			"local id = ...",
 			"local channel = get_comm_channel(id)",
 			"local function print(...) channel:Fire(...) end",
@@ -5772,7 +5772,7 @@ end]=],
 			indent(inner),
 			"end)",
 			"if not ok then channel:Fire(\"error:\", err) end",
-			"]" .. Level .. "]",
+			"]" .. level .. "]",
 			"",
 			"run_on_thread(getactorthreads()[thread_index], code, id)",
 		}, "\n")
@@ -5808,7 +5808,7 @@ end]=],
 		inner = table.concat(lines, "\n")
 	end
 
-	return table.concat(header, "\n") .. "\n\n" .. Inner
+	return table.concat(header, "\n") .. "\n\n" .. inner
 end
 
 local function strip_comments(code)
@@ -5890,8 +5890,8 @@ local function generate(Log)
 
 	local head = string.sub(code, 1, #banner) == banner
 	local body = head and string.sub(code, #banner + 1) or code
-	local stripped = string.gsub(string.gsub(strip_comments((head and "\n" or "") .. Body), "\n\n\n+", "\n\n"), "^\n+", "")
-	return (head and (banner .. "\n\n") or "") .. Stripped
+	local stripped = string.gsub(string.gsub(strip_comments((head and "\n" or "") .. body), "\n\n\n+", "\n\n"), "^\n+", "")
+	return (head and (banner .. "\n\n") or "") .. stripped
 end
 
 local function unstack(Log)
@@ -6001,7 +6001,7 @@ UI.smart_path = function(object, context)
 	end
 
 	context.NeedsResolver = true
-	return "findremote(" .. path_of_raw(Parent, context) .. ", " .. quote(class) .. ", {" .. table.concat(names, ", ") .. "}, " .. Position .. ")"
+	return "findremote(" .. path_of_raw(Parent, context) .. ", " .. quote(class) .. ", {" .. table.concat(names, ", ") .. "}, " .. position .. ")"
 end
 
 serialize = function(Value, depth, seen, context)
@@ -6021,37 +6021,37 @@ serialize = function(Value, depth, seen, context)
 	elseif Type == "Instance" then
 		return path_of(Value, context)
 	elseif Type == "Vector3" then
-		return "Vector3.new(" .. List({Value.X, Value.Y, Value.Z}) .. ")"
+		return "Vector3.new(" .. list({Value.X, Value.Y, Value.Z}) .. ")"
 	elseif Type == "Vector2" then
-		return "Vector2.new(" .. List({Value.X, Value.Y}) .. ")"
+		return "Vector2.new(" .. list({Value.X, Value.Y}) .. ")"
 	elseif Type == "Vector3int16" then
-		return "Vector3int16.new(" .. List({Value.X, Value.Y, Value.Z}) .. ")"
+		return "Vector3int16.new(" .. list({Value.X, Value.Y, Value.Z}) .. ")"
 	elseif Type == "Vector2int16" then
-		return "Vector2int16.new(" .. List({Value.X, Value.Y}) .. ")"
+		return "Vector2int16.new(" .. list({Value.X, Value.Y}) .. ")"
 	elseif Type == "CFrame" then
-		return "CFrame.new(" .. List({Value.GetComponents(Value)}) .. ")"
+		return "CFrame.new(" .. list({Value.GetComponents(Value)}) .. ")"
 	elseif Type == "Color3" then
-		return "Color3.new(" .. List({Value.R, Value.G, Value.B}) .. ")"
+		return "Color3.new(" .. list({Value.R, Value.G, Value.B}) .. ")"
 	elseif Type == "BrickColor" then
 		return "BrickColor.new(" .. quote(Value.Name) .. ")"
 	elseif Type == "UDim2" then
-		return "UDim2.new(" .. List({Value.X.Scale, Value.X.Offset, Value.Y.Scale, Value.Y.Offset}) .. ")"
+		return "UDim2.new(" .. list({Value.X.Scale, Value.X.Offset, Value.Y.Scale, Value.Y.Offset}) .. ")"
 	elseif Type == "UDim" then
-		return "UDim.new(" .. List({Value.Scale, Value.Offset}) .. ")"
+		return "UDim.new(" .. list({Value.Scale, Value.Offset}) .. ")"
 	elseif Type == "EnumItem" then
 		return tostring(Value)
 	elseif Type == "Enum" then
 		return "Enum." .. tostring(Value)
 	elseif Type == "NumberRange" then
-		return "NumberRange.new(" .. List({Value.Min, Value.Max}) .. ")"
+		return "NumberRange.new(" .. list({Value.Min, Value.Max}) .. ")"
 	elseif Type == "Rect" then
-		return "Rect.new(" .. List({Value.Min.X, Value.Min.Y, Value.Max.X, Value.Max.Y}) .. ")"
+		return "Rect.new(" .. list({Value.Min.X, Value.Min.Y, Value.Max.X, Value.Max.Y}) .. ")"
 	elseif Type == "Ray" then
 		return "Ray.new(" .. serialize(Value.Origin) .. ", " .. serialize(Value.Direction) .. ")"
 	elseif Type == "NumberSequence" then
 		local points = { }
 		for _, point in Value.Keypoints do
-			table.insert(points, "NumberSequenceKeypoint.new(" .. List({point.Time, point.Value, point.Envelope}) .. ")")
+			table.insert(points, "NumberSequenceKeypoint.new(" .. list({point.Time, point.Value, point.Envelope}) .. ")")
 		end
 
 		return "NumberSequence.new({" .. table.concat(points, ", ") .. "})"
@@ -6067,11 +6067,11 @@ serialize = function(Value, depth, seen, context)
 	elseif Type == "DateTime" then
 		return "DateTime.fromUnixTimestampMillis(" .. Value.UnixTimestampMillis .. ")"
 	elseif Type == "TweenInfo" then
-		return "TweenInfo.new(" .. List({Value.Time}) .. ", " .. tostring(Value.EasingStyle) .. ", " .. tostring(Value.EasingDirection) .. ", " .. List({Value.RepeatCount}) .. ", " .. tostring(Value.Reverses) .. ", " .. List({Value.DelayTime}) .. ")"
+		return "TweenInfo.new(" .. list({Value.Time}) .. ", " .. tostring(Value.EasingStyle) .. ", " .. tostring(Value.EasingDirection) .. ", " .. list({Value.RepeatCount}) .. ", " .. tostring(Value.Reverses) .. ", " .. list({Value.DelayTime}) .. ")"
 	elseif Type == "Font" then
 		return "Font.new(" .. quote(Value.Family) .. ", " .. tostring(Value.Weight) .. ", " .. tostring(Value.Style) .. ")"
 	elseif Type == "PhysicalProperties" then
-		return "PhysicalProperties.new(" .. List({Value.Density, Value.Friction, Value.Elasticity, Value.FrictionWeight, Value.ElasticityWeight}) .. ")"
+		return "PhysicalProperties.new(" .. list({Value.Density, Value.Friction, Value.Elasticity, Value.FrictionWeight, Value.ElasticityWeight}) .. ")"
 	end
 
 	if Type == "function" then
@@ -6162,12 +6162,12 @@ function UI.highlight(source)
 
 		if string.find(escaped, "\n", 1, true) then
 			escaped = string.gsub(escaped, "[^\n]+", function(line)
-				return '<font color="' .. Color .. '">' .. Line .. "</font>"
+				return '<font color="' .. color .. '">' .. line .. "</font>"
 			end)
 
 			table.insert(out, escaped)
 		else
-			table.insert(out, '<font color="' .. Color .. '">' .. Escaped .. "</font>")
+			table.insert(out, '<font color="' .. color .. '">' .. escaped .. "</font>")
 		end
 	end
 
@@ -6177,7 +6177,7 @@ function UI.highlight(source)
 			local level = string.match(source, "^%-%-%[(=*)%[", position)
 			local stop
 			if level then
-				local _, close = string.find(source, "]" .. Level .. "]", position, true)
+				local _, close = string.find(source, "]" .. level .. "]", position, true)
 				stop = close or length
 			else
 				stop = (string.find(source, "\n", position, true) or length + 1) - 1
@@ -6203,7 +6203,7 @@ function UI.highlight(source)
 			previous = Char
 		elseif Char == "[" and string.find(source, "^%[=*%[", position) then
 			local level = string.match(source, "^%[(=*)%[", position)
-			local _, close = string.find(source, "]" .. Level .. "]", position, true)
+			local _, close = string.find(source, "]" .. level .. "]", position, true)
 			local stop = close or length
 			put(string.sub(source, position, stop), colors.String)
 			position = stop + 1
@@ -6380,13 +6380,13 @@ local function parse_value(raw)
 
 	local code = nil
 	if string.sub(raw, 1, 1) == "{" or string.match(raw, "^[%a_][%w_]*%s*=[^=]") then
-		code = string.sub(raw, 1, 1) == "{" and raw or ("{" .. Raw .. "}")
+		code = string.sub(raw, 1, 1) == "{" and raw or ("{" .. raw .. "}")
 	elseif string.match(raw, "^[%a_][%w_%.]*%.new%(") or string.match(raw, "^Enum%.") or string.match(raw, "^CFrame%.") or string.match(raw, "^Color3%.") then
 		code = raw
 	end
 
 	if code and loadstring then
-		local compiled = loadstring("return " .. Code)
+		local compiled = loadstring("return " .. code)
 		if compiled then
 			local ok, Value = pcall(compiled)
 			if ok then
@@ -6546,7 +6546,7 @@ render = function()
 		local row = get_row(index)
 		local kind = kinds[Log.Kind]
 		local kind_tint = kind_color(Log.Kind)
-		local color = "#" .. KindTint.ToHex(kind_tint)
+		local color = "#" .. kind_tint.ToHex(kind_tint)
 		local extra = ""
 		row.Count.Text = Log.Calls > 1 and ("x" .. Log.Calls) or ""
 		if Log.Actor then
@@ -6600,7 +6600,7 @@ render = function()
 		row.Icon.ImageColor3 = kind_color(Log.Kind)
 		row.Label.Position = UDim2.new(0, icon and 24 or 8, 0, 0)
 		row.Label.Size = UDim2.new(1, icon and -138 or -122, 1, 0)
-		row.Label.Text = (icon and "" or ('<font color="' .. Color .. '">' .. Kind.Tag .. "</font>  ")) .. Esc(display_name(Log)) .. ' <font color="' .. hex.Dim .. '">' .. Extra .. "</font>"
+		row.Label.Text = (icon and "" or ('<font color="' .. color .. '">' .. kind.Tag .. "</font>  ")) .. Esc(display_name(Log)) .. ' <font color="' .. hex.Dim .. '">' .. extra .. "</font>"
 		row.Time.Text = Log.Time
 		local is_selected = Log == selected
 		row.BackgroundColor3 = is_selected and T.Element or T.Hover
@@ -6725,7 +6725,7 @@ local function decompile_caller(script)
 		return
 	end
 
-	show_source("source  " .. name_of(script) .. "  (decompiling...)", "-- decompiling " .. Path .. "...")
+	show_source("source  " .. name_of(script) .. "  (decompiling...)", "-- decompiling " .. path .. "...")
 	set_status("decompiling " .. name_of(script) .. "...")
 	task.spawn(function()
 		local success, result = Decompile(script)
@@ -6733,10 +6733,10 @@ local function decompile_caller(script)
 			result = string.gsub(string.gsub(result, "\r\n", "\n"), "\t", "    ")
 			UI.source_cache[script] = result
 			set_status("decompiled " .. name_of(script))
-			show_source("source  " .. name_of(script), "-- " .. Path .. "\n\n" .. Result)
+			show_source("source  " .. name_of(script), "-- " .. path .. "\n\n" .. result)
 		else
 			set_status(result)
-			show_source("source  " .. name_of(script) .. "  (failed)", "-- couldn't decompile " .. Path .. "\n-- " .. Result)
+			show_source("source  " .. name_of(script) .. "  (failed)", "-- couldn't decompile " .. path .. "\n-- " .. result)
 		end
 	end)
 end
@@ -6769,7 +6769,7 @@ UI.fire_all = function(kind, remote, Value)
 	for _, Id in UI.remote_ids(remote) do
 		pcall(function() channel.Fire(channel, kind, Id, Value) end)
 		local literal = type(Value) == "string" and string.format("%q", Value) or tostring(Value)
-		local source = "local G = (getgenv and getgenv()) or _G local S = G.__LarpSpyActor if S and S.Apply then S.Apply(" .. string.format("%q", kind) .. ", " .. string.format("%q", Id) .. ", " .. Literal .. ") end"
+		local source = "local G = (getgenv and getgenv()) or _G local S = G.__LarpSpyActor if S and S.Apply then S.Apply(" .. string.format("%q", kind) .. ", " .. string.format("%q", Id) .. ", " .. literal .. ") end"
 		for _, run in UI.injected or { } do
 			if type(run) == "function" and pcall(run, source) then
 				pushed += 1
@@ -6778,7 +6778,7 @@ UI.fire_all = function(kind, remote, Value)
 	end
 
 	if pushed > 0 then
-		set_status("sent " .. Kind .. " to " .. Pushed .. " actor hook(s)")
+		set_status("sent " .. kind .. " to " .. pushed .. " actor hook(s)")
 	end
 end
 
@@ -6928,7 +6928,7 @@ local function open_hook(Log)
 			shown = ok and string.gsub(code, "%s+", " ") or "?"
 		end
 
-		Text(row, {Size = UDim2.new(0.55, -6, 1, 0), Text = "[" .. Index .. "] " .. Shown})
+		Text(row, {Size = UDim2.new(0.55, -6, 1, 0), Text = "[" .. index .. "] " .. shown})
 		local box = Input(row, {AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0.45, 0, 1, 0)}, "override")
 		if current[index] then
 			box.Text = show_value(current[index].Value)
@@ -7032,7 +7032,7 @@ UI.open_block_args = function(Log)
 		end)
 	end
 
-	add_row(0, "amount of arguments (" .. Call.Count .. ")", "same", function()
+	add_row(0, "amount of arguments (" .. call.Count .. ")", "same", function()
 		draft.SameCount = not draft.SameCount
 		return draft.SameCount and "same" or "any"
 	end)
@@ -7043,7 +7043,7 @@ UI.open_block_args = function(Log)
 		draft.Modes[index] = "value"
 		draft.Types[index] = typeof(Value)
 		draft.Values[index] = UI.value_key(Value)
-		add_row(index, "[" .. Index .. "] " .. (ok and string.gsub(code, "%s+", " ") or "?"), "value", function()
+		add_row(index, "[" .. index .. "] " .. (ok and string.gsub(code, "%s+", " ") or "?"), "value", function()
 			local position = table.find(block_modes, draft.Modes[index]) or 1
 			draft.Modes[index] = block_modes[position % #block_modes + 1]
 			return draft.Modes[index]
@@ -7409,7 +7409,7 @@ UI.set_block_all_touches = function(Bool)
 				count += 1
 			end
 
-			set_status("blocked touches on " .. Count .. " parts")
+			set_status("blocked touches on " .. count .. " parts")
 		end)
 	else
 		for part in UI.auto_blocked do
@@ -7587,7 +7587,7 @@ end
 
 UI.set_loop = function(Log, Bool)
 	if (Log.Kind == "lib" and not UI.is_packet_log(Log)) or Log.Kind == "logservice" or Log.Kind == "wait" then
-		set_status("not looping a " .. Kinds[Log.Kind].Tag .. " row")
+		set_status("not looping a " .. kinds[Log.Kind].Tag .. " row")
 		return
 	end
 
@@ -7681,7 +7681,7 @@ UI.copy_hook_code = function(Log, with_args)
 		table.sort(indexes)
 		for _, index in indexes do
 			local ok, code = pcall(serialize, current[index].Value)
-			table.insert(rows, "\t[" .. Index .. "] = " .. (ok and code or "nil") .. ",")
+			table.insert(rows, "\t[" .. index .. "] = " .. (ok and code or "nil") .. ",")
 		end
 	end
 
@@ -7791,7 +7791,7 @@ UI.copy_oth_hook = function(Log)
 		table.insert(lines, "local overrides = {")
 		for _, index in indexes do
 			local ok, code = pcall(serialize, current[index].Value)
-			table.insert(lines, "\t[" .. Index .. "] = " .. (ok and code or "nil") .. ",")
+			table.insert(lines, "\t[" .. index .. "] = " .. (ok and code or "nil") .. ",")
 		end
 
 		table.insert(lines, "}")
@@ -7982,7 +7982,7 @@ Button(UI.history_row, "history", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize =
 	for index = #selected.History, 1, -1 do
 		local record = selected.History[index]
 		local caller = record.Script and ("  " .. name_of(record.Script)) or ""
-		table.insert(options, {"#" .. record.number .. "  " .. record.Time .. "  " .. record.Count .. " args" .. Caller, function() view_call(index) end, index == current and T.Accent or nil})
+		table.insert(options, {"#" .. record.number .. "  " .. record.Time .. "  " .. record.Count .. " args" .. caller, function() view_call(index) end, index == current and T.Accent or nil})
 	end
 
 	open_menu(options, 220)
@@ -8131,8 +8131,8 @@ show_details = function(Log, keep_scroll)
 	end
 
 	local kind_tint = kind_color(Log.Kind)
-	local color = "#" .. KindTint.ToHex(kind_tint)
-	UI.info_name.Text = Esc(display_name(Log)) .. ' <font color="' .. hex.Dim .. '">' .. Esc(display_class(Log)) .. '</font>  <font color="' .. Color .. '">' .. Kinds[Log.Kind].Tag .. "</font>"
+	local color = "#" .. kind_tint.ToHex(kind_tint)
+	UI.info_name.Text = Esc(display_name(Log)) .. ' <font color="' .. hex.Dim .. '">' .. Esc(display_class(Log)) .. '</font>  <font color="' .. color .. '">' .. kinds[Log.Kind].Tag .. "</font>"
 	local ok_path, path = pcall(display_path, Log)
 	UI.info_path.Text = ok_path and path or ""
 	if Log.Signal and not Log.OwnerSearched then
@@ -8175,7 +8175,7 @@ show_details = function(Log, keep_scroll)
 	UI.history_row.Visible = #history > 1
 	if #history > 1 then
 		local index = Log.ViewIndex or #history
-		UI.history_label.Text = "call #" .. (call.number or Log.Calls) .. " of " .. Log.Calls .. "  (" .. Index .. "/" .. #history .. " kept)" .. (Log.ViewIndex and "" or "  latest")
+		UI.history_label.Text = "call #" .. (call.number or Log.Calls) .. " of " .. Log.Calls .. "  (" .. index .. "/" .. #history .. " kept)" .. (Log.ViewIndex and "" or "  latest")
 		UI.history_row.Position = UDim2.new(0, 8, 0, Y)
 		Y += 22
 	end
@@ -8547,7 +8547,7 @@ UI.anim_info = function(Id)
 
 	local ok, Info = pcall(function() local market = game.GetService(game, "MarketplaceService") return market.GetProductInfo(market, num, Enum.InfoType.Asset) end)
 	if not ok or type(Info) ~= "table" then
-		return "couldn't read asset " .. Num
+		return "couldn't read asset " .. num
 	end
 
 	return tostring(Info.Name) .. " by " .. tostring(Info.Creator and Info.Creator.Name) .. " (asset type " .. tostring(Info.AssetTypeId) .. ")"
@@ -8610,9 +8610,9 @@ UI.anim_api_load = function()
 	if is_group then
 		local ids = { }
 		for page = 1, 10 do
-			UI.api_status = "loading page " .. Page .. " (group " .. tostring(creator.Name) .. ")..."
+			UI.api_status = "loading page " .. page .. " (group " .. tostring(creator.Name) .. ")..."
 			UI.api_dirty = true
-			local Data, why = UI.anim_http("https://apis.roblox.com/toolbox-service/v1/marketplace/24?limit=100&pageNumber=" .. Page .. "&creatorType=2&creatorTargetId=" .. tostring(creator_id))
+			local Data, why = UI.anim_http("https://apis.roblox.com/toolbox-service/v1/marketplace/24?limit=100&pageNumber=" .. page .. "&creatorType=2&creatorTargetId=" .. tostring(creator_id))
 			if not Data then
 				failure = why
 				break
@@ -8634,9 +8634,9 @@ UI.anim_api_load = function()
 	else
 		local cursor = ""
 		for page = 1, 10 do
-			UI.api_status = "loading page " .. Page .. " (user " .. tostring(creator.Name) .. ")..."
+			UI.api_status = "loading page " .. page .. " (user " .. tostring(creator.Name) .. ")..."
 			UI.api_dirty = true
-			local Data, why = UI.anim_http("https://inventory.roblox.com/v2/users/" .. tostring(creator_id) .. "/inventory/24?limit=100&sortOrder=Asc" .. Cursor)
+			local Data, why = UI.anim_http("https://inventory.roblox.com/v2/users/" .. tostring(creator_id) .. "/inventory/24?limit=100&sortOrder=Asc" .. cursor)
 			if not Data then
 				failure = why
 				break
@@ -8654,7 +8654,7 @@ UI.anim_api_load = function()
 		end
 	end
 
-	UI.api_status = #UI.api_anim_order .. " animations by " .. tostring(creator.Name) .. (failure and (" (stopped: " .. Failure .. ")") or "") .. (#UI.api_anim_order == 0 and " - Roblox doesn't expose them for this creator" or "")
+	UI.api_status = #UI.api_anim_order .. " animations by " .. tostring(creator.Name) .. (failure and (" (stopped: " .. failure .. ")") or "") .. (#UI.api_anim_order == 0 and " - Roblox doesn't expose them for this creator" or "")
 	UI.anim_api_busy = false
 	UI.api_dirty = true
 end
@@ -8688,7 +8688,7 @@ UI.anim_rbxm = function(Id, Name)
 	for _, path in {base, base .. ".txt"} do
 		local ok, err = pcall(writefile, path, Data)
 		if ok and (not isfile or isfile(path)) then
-			return "saved " .. Path .. (path ~= base and " (executor blocks .rbxm: remove the .txt)" or "") .. " [" .. #Data .. " bytes]"
+			return "saved " .. path .. (path ~= base and " (executor blocks .rbxm: remove the .txt)" or "") .. " [" .. #Data .. " bytes]"
 		end
 
 		failure = ok and "file was not created" or tostring(err)
@@ -8753,10 +8753,10 @@ UI.anim_save = function(Id, Name)
 	end
 
 	if isfile and not isfile(path) then
-		return "saveinstance finished but no file at " .. Path .. "; " .. UI.anim_rbxm(Id, Name)
+		return "saveinstance finished but no file at " .. path .. "; " .. UI.anim_rbxm(Id, Name)
 	end
 
-	return "saved keyframes to " .. Path
+	return "saved keyframes to " .. path
 end
 
 UI.anim_match = function(...)
@@ -8793,7 +8793,7 @@ UI.anim_stop_all = function()
 	end
 
 	UI.anim_dirty, UI.game_anim_dirty = true, true
-	return "stopped " .. Count .. " animations"
+	return "stopped " .. count .. " animations"
 end
 
 UI.anim_play = function(Id)
@@ -8875,7 +8875,7 @@ UI.upvalue_spy = function(Name)
 
 		local got, ups = pcall(get, fn)
 		for index, up in got and type(ups) == "table" and ups or { } do
-			local label = "upvalue_" .. string.gsub(Name, "[^%w_]", "_") .. "_" .. Index
+			local label = "upvalue_" .. string.gsub(Name, "[^%w_]", "_") .. "_" .. index
 			if type(up) == "function" then
 				local is_executor = false
 				pcall(function() is_executor = isexecutorclosure and isexecutorclosure(up) or false end)
@@ -8940,7 +8940,7 @@ UI.upvalue_spy = function(Name)
 		end)
 	end
 
-	return "upvalue spy: " .. Hooks .. " functions hooked, " .. Watching .. " values watched (" .. math.min(#found, 15) .. " functions named " .. Name .. ")"
+	return "upvalue spy: " .. hooks .. " functions hooked, " .. watching .. " values watched (" .. math.min(#found, 15) .. " functions named " .. Name .. ")"
 end
 
 do
@@ -9531,12 +9531,12 @@ local function actor_targets()
 	if X.get_actors and X.RunOnActor then
 		local ok, list = pcall(X.get_actors)
 		for index, Actor in ok and list or { } do
-			table.insert(targets, {Key = Actor, Label = typeof(Actor) == "Instance" and UI.actor_label_of(Actor, index) or ("actor " .. Index), Run = function(source) X.RunOnActor(Actor, source) end})
+			table.insert(targets, {Key = Actor, Label = typeof(Actor) == "Instance" and UI.actor_label_of(Actor, index) or ("actor " .. index), Run = function(source) X.RunOnActor(Actor, source) end})
 		end
 	elseif X.get_actor_threads and X.RunOnThread then
 		local ok, list = pcall(X.get_actor_threads)
 		for index, thread in ok and list or { } do
-			table.insert(targets, {Key = thread, Label = "actor thread " .. Index, Run = function(source) X.RunOnThread(thread, source) end})
+			table.insert(targets, {Key = thread, Label = "actor thread " .. index, Run = function(source) X.RunOnThread(thread, source) end})
 		end
 	end
 
@@ -9591,7 +9591,7 @@ local function inject_actors(force)
 		task.delay(0.5, UI.sync_actor_state)
 	end
 
-	UI.actor_status = UI.injected_count .. " actor" .. (UI.injected_count == 1 and "" or "s") .. " hooked" .. (failed > 0 and (", " .. Failed .. " failed") or "")
+	UI.actor_status = UI.injected_count .. " actor" .. (UI.injected_count == 1 and "" or "s") .. " hooked" .. (failed > 0 and (", " .. failed .. " failed") or "")
 	update_actor_info()
 end
 
@@ -9871,7 +9871,7 @@ UI.multi_choice = function(content, label, key, options, empty_text, on_change)
 		local set, names = chosen(), { }
 		for _, option in options do
 			local on = set[option] == true
-			buttons[option].Text = (on and "[x] " or "[ ] ") .. Option
+			buttons[option].Text = (on and "[x] " or "[ ] ") .. option
 			buttons[option].TextColor3 = on and T.Accent or T.Text
 			if on then
 				table.insert(names, option)
@@ -10010,7 +10010,7 @@ UI.net_report = function()
 		X.SetClipboard(path .. "\n\n" .. table.concat(lines, "\n"))
 	end
 
-	set_status("network finder: " .. (ok and path or best.Caller.Name) .. " (" .. Best.Entry.Count .. " modules), top 5 copied")
+	set_status("network finder: " .. (ok and path or best.Caller.Name) .. " (" .. best.Entry.Count .. " modules), top 5 copied")
 end
 
 local function Info(content, String)
@@ -10066,7 +10066,7 @@ UI.keybind = function(content, label, key, allow_none)
 			Settings[key] = code.Name
 			changed(key)
 			draw(false)
-			set_status(label .. " = " .. Code.Name)
+			set_status(label .. " = " .. code.Name)
 		end
 	end)
 end
@@ -10198,7 +10198,7 @@ UI.net_find = function(module)
 		entry.Told = true
 		task.defer(function()
 			local ok, path = pcall(path_of, caller)
-			set_status("network finder: " .. (ok and path or caller.Name) .. " loads " .. Entry.Count .. "+ modules")
+			set_status("network finder: " .. (ok and path or caller.Name) .. " loads " .. entry.Count .. "+ modules")
 		end)
 	end
 end
@@ -10213,7 +10213,7 @@ end
 	check(hooks, "Incoming OnClientEvent", "Incoming", set_incoming)
 	check(hooks, "Direct calls (Remote.FireServer(Remote))", "Direct")
 	check(hooks, "Calls from executor scripts", "Executor")
-	Info(hooks, "hook: " .. HookStatus .. (X.hook_function and ", direct calls hooked" or ", no hookfunction"))
+	Info(hooks, "hook: " .. hook_status .. (X.hook_function and ", direct calls hooked" or ", no hookfunction"))
 	end
 
 	do
@@ -10304,7 +10304,7 @@ end
 			end
 
 			local row = Text(anim_list, {LayoutOrder = shown, Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = T.Inline, BackgroundTransparency = 0.3, Text = ""}, "TextButton")
-			Text(row, {Position = UDim2.new(0, 6, 0, 2), Size = UDim2.new(1, -12, 0, 13), Text = (UI.anim_tracks[entry.Id] and "[playing] " or "") .. Entry.Name .. "  -  " .. Entry.Owner .. string.format("  (%.1fs%s)", entry.Length, entry.Looped and ", loop" or ""), TextTruncate = Enum.TextTruncate.AtEnd})
+			Text(row, {Position = UDim2.new(0, 6, 0, 2), Size = UDim2.new(1, -12, 0, 13), Text = (UI.anim_tracks[entry.Id] and "[playing] " or "") .. entry.Name .. "  -  " .. entry.Owner .. string.format("  (%.1fs%s)", entry.Length, entry.Looped and ", loop" or ""), TextTruncate = Enum.TextTruncate.AtEnd})
 			Text(row, {Position = UDim2.new(0, 6, 0, 16), Size = UDim2.new(1, -12, 0, 13), Text = entry.Id, TextColor3 = T.Dim, TextTruncate = Enum.TextTruncate.AtEnd})
 			Connect(row.MouseEnter, function() row.BackgroundTransparency = 0.1 end)
 			Connect(row.MouseLeave, function() row.BackgroundTransparency = 0.3 end)
@@ -10345,7 +10345,7 @@ end
 
 			local index = game_shown
 			local row = Text(game_list, {LayoutOrder = index, Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = T.Inline, BackgroundTransparency = 0.3, Text = ""}, "TextButton")
-			Text(row, {Position = UDim2.new(0, 6, 0, 2), Size = UDim2.new(1, -12, 0, 13), Text = (UI.anim_tracks[Id] and "[playing] " or "") .. Entry.Path .. (entry.Copies > 1 and ("  x" .. Entry.Copies) or ""), TextTruncate = Enum.TextTruncate.AtEnd})
+			Text(row, {Position = UDim2.new(0, 6, 0, 2), Size = UDim2.new(1, -12, 0, 13), Text = (UI.anim_tracks[Id] and "[playing] " or "") .. entry.Path .. (entry.Copies > 1 and ("  x" .. entry.Copies) or ""), TextTruncate = Enum.TextTruncate.AtEnd})
 			Text(row, {Position = UDim2.new(0, 6, 0, 16), Size = UDim2.new(1, -12, 0, 13), Text = Id, TextColor3 = T.Dim, TextTruncate = Enum.TextTruncate.AtEnd})
 			Connect(row.MouseEnter, function() row.BackgroundTransparency = 0.1 end)
 			Connect(row.MouseLeave, function() row.BackgroundTransparency = 0.3 end)
@@ -10383,7 +10383,7 @@ end
 			end
 
 			local row = Text(api_list, {LayoutOrder = api_shown, Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = T.Inline, BackgroundTransparency = 0.3, Text = ""}, "TextButton")
-			Text(row, {Position = UDim2.new(0, 6, 0, 2), Size = UDim2.new(1, -12, 0, 13), Text = (UI.anim_tracks[Id] and "[playing] " or "") .. Entry.Name, TextTruncate = Enum.TextTruncate.AtEnd})
+			Text(row, {Position = UDim2.new(0, 6, 0, 2), Size = UDim2.new(1, -12, 0, 13), Text = (UI.anim_tracks[Id] and "[playing] " or "") .. entry.Name, TextTruncate = Enum.TextTruncate.AtEnd})
 			Text(row, {Position = UDim2.new(0, 6, 0, 16), Size = UDim2.new(1, -12, 0, 13), Text = Id, TextColor3 = T.Dim, TextTruncate = Enum.TextTruncate.AtEnd})
 			Connect(row.MouseEnter, function() row.BackgroundTransparency = 0.1 end)
 			Connect(row.MouseLeave, function() row.BackgroundTransparency = 0.3 end)
@@ -10698,7 +10698,7 @@ end
 		end
 
 		local code = string.match(String, "^#?(%x%x%x%x%x%x)$")
-		return code and "#" .. Code or nil
+		return code and "#" .. code or nil
 	end, function() UI.apply_colors() end)
 	Info(theme, "Theme and accent apply instantly. Empty custom accent = preset.")
 	end
@@ -10858,7 +10858,7 @@ end
 	local ignored_list = section(6, "ignored")
 	local function describe(key)
 		if typeof(key) == "Instance" then
-			local ok, label = pcall(function() return key.ClassName .. "  " .. Key.Name end)
+			local ok, label = pcall(function() return key.ClassName .. "  " .. key.Name end)
 			return ok and label or tostring(key)
 		end
 
@@ -10995,7 +10995,7 @@ end
 			if entry.Dir == "in" and not crash.ensure_proxy(remote) then
 				set_status("this executor has no getconnections: incoming remotes can't be blocked")
 			else
-				set_status("blocked " .. Remote.Name .. (by_args and " (these arguments)" or ""))
+				set_status("blocked " .. remote.Name .. (by_args and " (these arguments)" or ""))
 			end
 
 			crash.redraw()
@@ -11017,7 +11017,7 @@ end
 			end
 
 			crash.unproxy(remote)
-			set_status("unblocked " .. Remote.Name)
+			set_status("unblocked " .. remote.Name)
 			crash.redraw()
 		end
 
@@ -11057,12 +11057,12 @@ end
 				local from = "no remote fired near it"
 				if entry.Remote then
 					local ok, path = pcall(function() return entry.Remote.GetFullName(entry.Remote) end)
-					from = (entry.Dir == "in" and "incoming " or "outgoing ") .. (ok and path or tostring(entry.Remote)) .. "  args: " .. Crash.preview(entry.Args) .. "  [" .. tostring(entry.Conf) .. "]" .. (entry.Fired and ("\nfired by " .. Entry.Fired) or "")
+					from = (entry.Dir == "in" and "incoming " or "outgoing ") .. (ok and path or tostring(entry.Remote)) .. "  args: " .. crash.preview(entry.Args) .. "  [" .. tostring(entry.Conf) .. "]" .. (entry.Fired and ("\nfired by " .. entry.Fired) or "")
 				end
 
 				local row = New("Frame", {Parent = holder, LayoutOrder = index, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1})
 				New("UIListLayout", {Parent = row, Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder})
-				Text(row, {LayoutOrder = 0, Size = UDim2.new(1, 0, 0, 12), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, Text = "[" .. Entry.Kind .. " x" .. Entry.Hits .. "] " .. tostring(entry.Detail) .. "\n" .. tostring(entry.Source) .. ":" .. tostring(entry.Line) .. " (" .. tostring(entry.Func) .. (entry.Defined and (", function starts at line " .. Entry.Defined) or "") .. ")\n" .. From .. (entry.root and ("\nthread started by " .. Entry.root) or "")})
+				Text(row, {LayoutOrder = 0, Size = UDim2.new(1, 0, 0, 12), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, Text = "[" .. entry.Kind .. " x" .. entry.Hits .. "] " .. tostring(entry.Detail) .. "\n" .. tostring(entry.Source) .. ":" .. tostring(entry.Line) .. " (" .. tostring(entry.Func) .. (entry.Defined and (", function starts at line " .. entry.Defined) or "") .. ")\n" .. from .. (entry.root and ("\nthread started by " .. entry.root) or "")})
 				local bar = New("Frame", {Parent = row, LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1})
 				local order = 0
 				HorizontalList(bar, 4)
@@ -11578,7 +11578,7 @@ Connect(user_input_service.InputBegan, function(input_object, processed)
 			show_details(Log, true)
 		end
 
-		set_status("bound " .. Code.Name .. " to " .. display_name(Log))
+		set_status("bound " .. code.Name .. " to " .. display_name(Log))
 		return
 	end
 
@@ -11682,7 +11682,7 @@ UI.scan_log_readers = function()
 		end
 	end
 
-	set_status("MessageOut: " .. Seen .. " existing connection" .. (seen == 1 and "" or "s") .. (Settings.BlockLogReaders and (", " .. Disabled .. " disabled") or ""))
+	set_status("MessageOut: " .. seen .. " existing connection" .. (seen == 1 and "" or "s") .. (Settings.BlockLogReaders and (", " .. disabled .. " disabled") or ""))
 end
 
 UI.restore_log_readers = function()
@@ -11694,7 +11694,7 @@ UI.restore_log_readers = function()
 	end
 
 	if count > 0 then
-		set_status("re-enabled " .. Count .. " MessageOut connection" .. (count == 1 and "" or "s"))
+		set_status("re-enabled " .. count .. " MessageOut connection" .. (count == 1 and "" or "s"))
 	end
 end
 
@@ -11886,7 +11886,7 @@ UI.set_misc = function()
 	for _, spec in specs do
 		if spec[2] then
 			methods[spec[1]] = true
-			hook_direct("Misc" .. Spec[1], probe(spec[3], spec[1]), spec[1])
+			hook_direct("Misc" .. spec[1], probe(spec[3], spec[1]), spec[1])
 		end
 	end
 end
@@ -11918,7 +11918,7 @@ UI.set_packets = function()
 		for _, Method in {"send", "invoke"} do
 		local target = type(entry.Packet) == "table" and UI.safe_get(entry.Packet, Method)
 		if type(target) == "function" then
-			local require_label = "require(" .. Entry.Path .. ")" .. (entry.Via and ("." .. Entry.Via) or "") .. UI.member(entry.Name) .. "." .. Method
+			local require_label = "require(" .. entry.Path .. ")" .. (entry.Via and ("." .. entry.Via) or "") .. UI.member(entry.Name) .. "." .. Method
 			local filter_label = "find_packet(" .. string.format("%q", entry.Name) .. ", " .. string.format("%q", Method) .. ")." .. Method
 			local done = pcall(function()
 				local old
@@ -12031,7 +12031,7 @@ UI.load_log_backlog = function()
 		end
 	end
 
-	set_status("loaded " .. Loaded .. " lines of existing output")
+	set_status("loaded " .. loaded .. " lines of existing output")
 end
 
 do
