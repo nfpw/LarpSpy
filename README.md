@@ -9,7 +9,7 @@ A remote inspection and debugging tool for Roblox. It logs the remote calls a ga
 1. Run the loader in your test environment:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/nfpw/LarpSpy/main/loadstring.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/nfpw/LarpSpy/refs/heads/main/larp.lua"))()
 ```
 
 2. Press `RightControl` to show or hide the window.
