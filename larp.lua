@@ -1,6 +1,6 @@
 --[[
-	some part of the code mine but mostly made with claude opus 5.5/sonnet 5.5 thanks to that
-	sorry for bad code
+	some part of the code mine but mostly made with claude
+	sorry for poop code orginal repo: https://github.com/nfpw/LarpSpy
 ]]
 
 --[[
@@ -3151,6 +3151,10 @@ pcall(function()
 end)
 
 kind_icons.loghistory = kind_icons.loghistory or kind_icons.require
+UI.titles = UI.titles or { }
+UI.check_rows = UI.check_rows or { }
+UI.duals = UI.duals or { }
+UI.classic_only = UI.classic_only or { }
 local Lib = (UI.assets or assert(loadstring(assert(http_get("https://raw.githubusercontent.com/nfpw/LarpSpy/main/uiassets.lua"), "couldn't download uiassets.lua"), "uiassets"))())({
 	t = T, ui = UI, connect = Connect, tween_service = TweenService, accented = Accented,
 	font = function() return font_face, font_size, pixel end,
@@ -3286,14 +3290,14 @@ do
 
 		if dragging then
 			local delta = input_object.Position - drag_start
-			main.Position = UDim2.new(start_position.X.scale, start_position.X.Offset + delta.X, start_position.Y.Scale, start_position.Y.Offset + delta.Y)
+			main.Position = UDim2.new(start_position.X.Scale, start_position.X.Offset + delta.X, start_position.Y.Scale, start_position.Y.Offset + delta.Y)
 		elseif resizing then
 			local delta = input_object.Position - resize_start
 			local screen = Gui.AbsoluteSize
 			local width = math.clamp(start_size.X + resize_x * delta.X, 600, math.max(600, screen.X))
 			local height = math.clamp(start_size.Y + resize_y * delta.Y, 340, math.max(340, screen.Y))
 			main.Size = UDim2.new(0, width, 0, height)
-			main.Position = UDim2.new(resize_pos.X.scale, resize_pos.X.Offset + (resize_x == -1 and (start_size.X - width) or 0), resize_pos.Y.Scale, resize_pos.Y.Offset)
+			main.Position = UDim2.new(resize_pos.X.Scale, resize_pos.X.Offset + (resize_x == -1 and (start_size.X - width) or 0), resize_pos.Y.Scale, resize_pos.Y.Offset)
 		end
 	end)
 
@@ -6031,7 +6035,7 @@ serialize = function(Value, depth, seen, context)
 	elseif Type == "BrickColor" then
 		return "BrickColor.new(" .. quote(Value.Name) .. ")"
 	elseif Type == "UDim2" then
-		return "UDim2.new(" .. List({Value.X.scale, Value.X.Offset, Value.Y.Scale, Value.Y.Offset}) .. ")"
+		return "UDim2.new(" .. List({Value.X.Scale, Value.X.Offset, Value.Y.Scale, Value.Y.Offset}) .. ")"
 	elseif Type == "UDim" then
 		return "UDim.new(" .. List({Value.Scale, Value.Offset}) .. ")"
 	elseif Type == "EnumItem" then
@@ -9614,6 +9618,7 @@ UI.settings_scroll = New("ScrollingFrame", {
 	ScrollingDirection = Enum.ScrollingDirection.Y,
 })
 
+UI.titles = UI.titles or { }
 local columns = { }
 local section_order = 0
 local set_accent
