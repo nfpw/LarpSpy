@@ -4,6 +4,24 @@ A remote inspection and debugging tool for Roblox. It logs the remote calls a ga
 
 > **For educational and development use only.** Use it on games you own or have explicit permission to test. Do not use it to gain an unfair advantage in games or to violate the Roblox Terms of Use.
 
+## Usage
+
+1. Run the loader in your test environment:
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/nfpw/LarpSpy/main/loadstring.lua"))()
+```
+
+2. Press `RightControl` to show or hide the window.
+3. Enable the call types you want to inspect and play your game. Calls appear as they happen.
+4. Click a call to inspect it or copy its code.
+
+Re-running the script removes the previous window and restores its hooks first.
+
+## Community
+
+Join the Discord to report bugs, suggest features or chat with the community: https://discord.gg/xXv6Tn7GjR
+
 ## Features
 
 **Remote logging**
@@ -27,18 +45,13 @@ A remote inspection and debugging tool for Roblox. It logs the remote calls a ga
 - Settings are saved to `LarpSpy/settings.json`.
 - Configurable log limit, merging of repeated calls, ignored names, code style, theme and toggle key (default `RightControl`).
 
-## Usage
-
-1. Run the script in your test environment.
-2. Press `RightControl` to show or hide the window.
-3. Enable the call types you want to inspect and play your game. Calls appear as they happen.
-4. Click a call to inspect it or copy its code.
-
-Re-running the script removes the previous window and restores its hooks first.
-
 ## Requirements
 
 The environment must provide function hooking, metamethod hooking and file access (`hookfunction`, `hookmetamethod`, `getnamecallmethod`, `writefile`, `readfile`). Actor support needs `getactors` and `run_on_actor`. Missing functions are handled with fallbacks where possible.
+
+## Credits
+
+Based on [Larp-Spy](https://github.com/b-erk/Larp-Spy) by b-erk.
 
 ## Disclaimer
 
