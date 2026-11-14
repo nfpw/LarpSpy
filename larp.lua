@@ -1,6 +1,6 @@
 --[[
-	some part of the code mine but mostly made with claude
-	sorry for poop code orginal repo: https://github.com/nfpw/LarpSpy
+	some part of the code mine but mostly made with claude opus 5.5/sonnet 5.5 thanks to that
+	sorry for bad code
 ]]
 
 --[[
