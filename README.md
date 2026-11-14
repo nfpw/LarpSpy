@@ -49,10 +49,6 @@ Join the Discord to report bugs, suggest features or chat with the community: ht
 
 The environment must provide function hooking, metamethod hooking and file access (`hookfunction`, `hookmetamethod`, `getnamecallmethod`, `writefile`, `readfile`). Actor support needs `getactors` and `run_on_actor`. Missing functions are handled with fallbacks where possible.
 
-## Credits
-
-Based on [Larp-Spy](https://github.com/b-erk/Larp-Spy) by b-erk.
-
 ## Disclaimer
 
 This project is provided for learning and debugging. You are responsible for how you use it.
