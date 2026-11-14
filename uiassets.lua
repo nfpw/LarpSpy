@@ -177,7 +177,7 @@ local function build(ctx)
 	local lib = {}
 	local rgb = Color3.fromRGB
 
-	ui.Duals, ui.ClassicOnly, ui.Titles, ui.CheckRows = {}, {}, {}, {}
+	ui.duals, ui.classic_only, ui.titles, ui.check_rows = {}, {}, {}, {}
 
 	local function apply(object, props)
 		for key, value in props do
@@ -212,7 +212,7 @@ local function build(ctx)
 		local corner = parent.FindFirstChildOfClass(parent, "UICorner") or Instance.new("UICorner")
 
 		corner.SetAttribute(corner, "R", radius or 6)
-		corner.CornerRadius = UDim.new(0, ui.Classic and 0 or (radius or 6))
+		corner.CornerRadius = UDim.new(0, ui.classic and 0 or (radius or 6))
 		corner.Parent = parent
 
 		return corner
@@ -223,7 +223,7 @@ local function build(ctx)
 			round(parent)
 		end
 
-		return new("UIStroke", {Parent = parent, Color = color or t.Outline, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, LineJoinMode = ui.Classic and Enum.LineJoinMode.Miter or Enum.LineJoinMode.Round})
+		return new("UIStroke", {Parent = parent, Color = color or t.Outline, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, LineJoinMode = ui.classic and Enum.LineJoinMode.Miter or Enum.LineJoinMode.Round})
 	end
 
 	local function tween(object, goal, time)
@@ -266,15 +266,15 @@ local function build(ctx)
 	end
 
 	local function dual(object, classic_key, modern_key)
-		object.Color = t[ui.Classic and classic_key or modern_key]
-		table.insert(ui.Duals, {object, classic_key, modern_key})
+		object.Color = t[ui.classic and classic_key or modern_key]
+		table.insert(ui.duals, {object, classic_key, modern_key})
 
 		return object
 	end
 
 	local function only_classic(object)
-		object.Visible = ui.Classic == true
-		table.insert(ui.ClassicOnly, object)
+		object.Visible = ui.classic == true
+		table.insert(ui.classic_only, object)
 
 		return object
 	end
@@ -288,7 +288,7 @@ local function build(ctx)
 	end
 
 	local function panel(parent, title)
-		local classic = ui.Classic
+		local classic = ui.classic
 		local frame = new("Frame", {Parent = parent, BackgroundColor3 = t.Inline, BorderSizePixel = classic and 2 or 0, BorderColor3 = t.Outline, ClipsDescendants = true})
 
 		dual(stroke(frame), "Border", "Outline")
@@ -297,7 +297,7 @@ local function build(ctx)
 
 		local head = text(frame, {Name = "Title", Position = UDim2.new(0, classic and 7 or 10, 0, classic and 5 or 6), Size = UDim2.new(1, classic and -14 or -20, 0, classic and 12 or 14), Text = title, FontFace = ctx.bold(), TextColor3 = classic and t.Text or t.Accent})
 
-		table.insert(ui.Titles, head)
+		table.insert(ui.titles, head)
 
 		return frame, head
 	end
