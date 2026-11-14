@@ -51,4 +51,4 @@ The environment must provide function hooking, metamethod hooking and file acces
 
 ## Disclaimer
 
-This project is provided for learning and debugging. You are responsible for how you use it.
+This project is intended for educational and debugging purposes only. Use it at your own risk.
