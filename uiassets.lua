@@ -55,7 +55,7 @@ local function adonis_prompt(opts)
 
 	local box = new("CanvasGroup", {
 		Parent = gui, GroupTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, opts.has_oth and 470 or 380, 0, 132),
+		Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, opts.has_oth and 570 or 480, 0, 132),
 		BackgroundColor3 = bg, BorderSizePixel = 0, Active = true,
 	})
 
@@ -126,6 +126,24 @@ local function adonis_prompt(opts)
 		end)
 	end
 
+	local redraw_oth = function() end
+
+	if opts.reset then
+		local reset_button = make_button(-1, false)
+
+		reset_button.Text = "reset config"
+		on(reset_button.MouseEnter, function() fade(reset_button, {BackgroundColor3 = quiet_hover}) end)
+		on(reset_button.MouseLeave, function() fade(reset_button, {BackgroundColor3 = quiet}) end)
+		on(reset_button.MouseButton1Click, function()
+			pcall(opts.reset)
+			redraw_oth()
+			reset_button.Text = "config reset!"
+			task.delay(1.5, function()
+				if reset_button.Parent then reset_button.Text = "reset config" end
+			end)
+		end)
+	end
+
 	if opts.has_oth then
 		local toggle, toggle_border = make_button(0, false)
 
@@ -138,6 +156,7 @@ local function adonis_prompt(opts)
 		end
 
 		draw()
+		redraw_oth = draw
 
 		on(toggle.MouseEnter, function() fade(toggle, {BackgroundColor3 = quiet_hover}) end)
 		on(toggle.MouseLeave, function() fade(toggle, {BackgroundColor3 = quiet}) end)
