@@ -298,6 +298,11 @@ local Settings = {
 	GameOnly = false,
 }
 
+UI.default_settings = { }
+for key, Value in Settings do
+	UI.default_settings[key] = type(Value) == "table" and table.clone(Value) or Value
+end
+
 local function ensure_folder()
 	if isfolder and makefolder and not isfolder(folder) then
 		pcall(makefolder, folder)
@@ -362,6 +367,17 @@ if Settings.AskAdonis and not env.__LarpAdonisLoaded then
 			settings = Settings,
 			save = save_settings,
 			has_oth = oth and oth.hook,
+			reset = function()
+				for key, Value in UI.default_settings do
+					Settings[key] = type(Value) == "table" and table.clone(Value) or Value
+				end
+
+				if delfile and isfile and isfile(UI.game_file) then
+					pcall(delfile, UI.game_file)
+				end
+
+				save_settings()
+			end,
 			parent = function(ask)
 				if syn and syn.protect_gui then
 					pcall(syn.protect_gui, ask)
@@ -8018,6 +8034,7 @@ log_menu = function(Log)
 			end
 		end, T.Bad},
 		{"Ignore remote", function() set_ignored(Log.Remote, true) end},
+		{"Reset config to defaults", function() UI.reset_config() end, T.Bad},
 		{"Remove this log", function()
 			local position = table.find(logs, Log)
 			if position then
@@ -9668,6 +9685,27 @@ UI.apply_game_only = function(Bool)
 	end
 end
 
+UI.reset_config = function()
+	for key, Value in UI.default_settings do
+		Settings[key] = type(Value) == "table" and table.clone(Value) or Value
+	end
+
+	if delfile and isfile and isfile(UI.game_file) then
+		pcall(delfile, UI.game_file)
+	end
+
+	save_settings()
+	UI.classic = Settings.Look == "classic"
+	pcall(function() UI.apply_look() end)
+	pcall(function() UI.apply_colors() end)
+	pcall(sync_actors)
+	for _, draw in UI.check_draws do
+		pcall(draw)
+	end
+
+	set_status("config reset to defaults")
+end
+
 do local function changed(key)
 	if key == "GameOnly" then
 		UI.apply_game_only(Settings.GameOnly)
@@ -10819,6 +10857,8 @@ end
 
 	do
 	local clearing = section(5, "clear")
+	action(clearing, "reset config to defaults", function() UI.reset_config() end)
+
 	action(clearing, "unblock all names", function()
 		for Name in blocked_names do
 			UI.set_name_blocked(Name, false)
