@@ -185,6 +185,9 @@ local Settings = {
 	BlockCoreState = false,
 	Teleports = true,
 	BlockTeleports = false,
+	Purchases = true,
+	BlockPurchases = false,
+	OwnsSpoof = "off",
 	Shutdowns = true,
 	BlockShutdowns = false,
 	Creates = false,
@@ -498,6 +501,26 @@ local methods = {
 }
 
 local teleport_methods = {Teleport = true, TeleportToPlaceInstance = true, TeleportToSpawnByName = true}
+UI.purchase_arg_names = {
+	PromptProductPurchaseFinished = "userId, productId, isPurchased",
+	PromptGamePassPurchaseFinished = "player, gamePassId, wasPurchased",
+	PromptPurchaseFinished = "player, assetId, isPurchased",
+	PromptBundlePurchaseFinished = "player, bundleId, wasPurchased",
+	PromptPremiumPurchaseFinished = "player, wasPurchased",
+	PromptProductPurchase = "player, productId, equipIfPurchased, currencyType",
+	PromptGamePassPurchase = "player, gamePassId",
+	PromptPurchase = "player, assetId, equipIfPurchased, currencyType",
+	UserOwnsGamePassAsync = "userId, gamePassId",
+	PlayerOwnsAsset = "player, assetId",
+}
+local purchase_methods = {
+	UserOwnsGamePassAsync = true, PlayerOwnsAsset = true,
+	PromptGamePassPurchase = true, PromptProductPurchase = true, PromptPurchase = true, PromptBundlePurchase = true, PromptPremiumPurchase = true,
+	SignalPromptProductPurchaseFinished = true, SignalPromptGamePassPurchaseFinished = true, SignalPromptPurchaseFinished = true,
+}
+for Name in purchase_methods do
+	methods[Name] = true
+end
 
 UI.crash_detect = function()
 	return Settings.CrashFinder == true or Settings.BlockSpawnCrash == true
@@ -540,6 +563,8 @@ function __R.kind_of(class, Method, object)
 		return class == "LogService" and (Settings.LogHistory or Settings.BlockLogHistory) and "loghistory"
 	elseif Method == "Shutdown" then
 		return class == "DataModel" and Settings.Shutdowns and "shutdown"
+	elseif purchase_methods[Method] then
+		return class == "MarketplaceService" and (Settings.Purchases or Settings.BlockPurchases or Settings.OwnsSpoof ~= "off") and "purchase"
 	elseif teleport_methods[Method] then
 		return class == "TeleportService" and Settings.Teleports and "teleport"
 	elseif Method == "require" then
@@ -562,6 +587,7 @@ local kinds = {
 	shutdown = {Tag = "shutdown", Color = rgb(235, 90, 90)},
 	parentnil = {Tag = "parent", Color = rgb(235, 120, 90)},
 	teleport = {Tag = "tp", Color = rgb(240, 220, 100)},
+	purchase = {Tag = "buy", Color = rgb(120, 230, 150)},
 	create = {Tag = "create", Color = rgb(255, 140, 90)},
 	lib = {Tag = "lib", Color = rgb(255, 175, 110)},
 	logservice = {Tag = "log", Color = rgb(170, 215, 255)},
@@ -604,7 +630,7 @@ for http_method in UI.http_methods do
 	methods[http_method] = true
 end
 
-UI.kind_log_key = {event = "Events", unreliable = "Unreliable", ["function"] = "Functions", bindable = "Bindables", actormsg = "ActorMessages", tool = "Tools", anim = "Animations", loghistory = "LogHistory", getattr = "GetAttributes", setattr = "SetAttributes", sound = "Sounds"}
+UI.kind_log_key = {event = "Events", unreliable = "Unreliable", ["function"] = "Functions", bindable = "Bindables", actormsg = "ActorMessages", tool = "Tools", anim = "Animations", loghistory = "LogHistory", getattr = "GetAttributes", setattr = "SetAttributes", sound = "Sounds", purchase = "Purchases"}
 UI.kind_block_key = {event = "BlockEvents", unreliable = "BlockUnreliable", ["function"] = "BlockFunctions", bindable = "BlockBindables", actormsg = "BlockActorMessages", tool = "BlockTools", loghistory = "BlockLogHistory", sound = "BlockSounds", getattr = "BlockGetAttributes", setattr = "BlockSetAttributes"}
 UI.crash = {Ready = false, Frame = 0, Counts = { }, Hot = { }, Recent = { }, Head = 0, Found = { }, Pending = { }, ArgBlocks = { }, FullIn = { }, Proxy = { }, Watched = { }, OwnFns = setmetatable({ }, {__mode = "k"})}
 local hook_status = "hooked"
@@ -659,7 +685,7 @@ UI.namecall_filter = function()
 			end
 		end
 
-		for _, class in {"RemoteEvent", "UnreliableRemoteEvent", "RemoteFunction", "BindableEvent", "BindableFunction", "Player", "DataModel", "LogService", "StarterGui", "TeleportService", "HttpService", "Actor", "Tool"} do
+		for _, class in {"RemoteEvent", "UnreliableRemoteEvent", "RemoteFunction", "BindableEvent", "BindableFunction", "Player", "DataModel", "LogService", "StarterGui", "TeleportService", "MarketplaceService", "HttpService", "Actor", "Tool"} do
 			table.insert(classes, InstanceTypeFilter.new(1, class))
 		end
 
@@ -777,6 +803,10 @@ do
 	for Name in teleport_methods do
 		UI.strict[Name] = is("TeleportService")
 	end
+
+	for Name in purchase_methods do
+		UI.strict[Name] = is("MarketplaceService")
+	end
 end
 
 UI.direct_classes = {
@@ -788,6 +818,10 @@ UI.direct_classes = {
 	Teleport = {"TeleportService"}, TeleportToPlaceInstance = {"TeleportService"}, TeleportToSpawnByName = {"TeleportService"},
 	HttpGet = {"DataModel"}, HttpGetAsync = {"DataModel"}, HttpPost = {"DataModel"}, HttpPostAsync = {"DataModel"}, RequestAsync = {"HttpService"},
 }
+
+for Name in purchase_methods do
+	UI.direct_classes[Name] = {"MarketplaceService"}
+end
 
 if not shared.Installed.Namecall then
 	if X.get_namecall_method and (X.hook_metamethod or getrawmetatable) then
@@ -1191,6 +1225,12 @@ end
 if Settings.Teleports or Settings.BlockTeleports then
 for Method in teleport_methods do
 	hook_direct(Method, function() return game.GetService(game, "TeleportService")[Method] end, Method)
+end
+end
+
+if Settings.Purchases or Settings.BlockPurchases or Settings.OwnsSpoof ~= "off" then
+for Method in purchase_methods do
+	hook_direct(Method, function() return game.GetService(game, "MarketplaceService")[Method] end, Method)
 end
 end
 
@@ -2260,7 +2300,7 @@ shared.Capture = function(self, Method, direct, ...)
 
 	local replace = nil
 	local spec = overrides[self]
-	if spec and blocked[self] ~= true and not from_executor and (kind == "event" or kind == "unreliable" or kind == "function" or kind == "bindable") then
+	if spec and blocked[self] ~= true and not from_executor and (kind == "event" or kind == "unreliable" or kind == "function" or kind == "bindable" or (kind == "purchase" and UI.purchase_hook_method and UI.purchase_hook_method[self] == Method)) then
 		replace = table.pack(...)
 		for index, item in spec do
 			replace[index] = item.Value
@@ -2308,6 +2348,18 @@ shared.Capture = function(self, Method, direct, ...)
 		if block then
 			task.defer(function() shared.notify("blocked a teleport") end)
 		end
+	elseif kind == "purchase" then
+		if Method == "UserOwnsGamePassAsync" or Method == "PlayerOwnsAsset" then
+			block = Settings.OwnsSpoof ~= "off"
+			if block then
+				task.defer(function() shared.notify(Method .. " spoofed to " .. Settings.OwnsSpoof) end)
+			end
+		else
+			block = Settings.BlockPurchases == true and string.find(Method, "^Signal") ~= nil
+			if block then
+				task.defer(function() shared.notify("blocked " .. Method) end)
+			end
+		end
 	elseif kind == "require" then
 		block = false
 	end
@@ -2322,6 +2374,10 @@ shared.Capture = function(self, Method, direct, ...)
 	if final then
 		if kind == "loghistory" then
 			fake = { }
+		elseif kind == "purchase" then
+			if Method == "UserOwnsGamePassAsync" or Method == "PlayerOwnsAsset" then
+				fake = Settings.OwnsSpoof == "true"
+			end
 		elseif kind == "getattr" then
 			local done, Value = pcall(UI.attr_fake, self, ...)
 			if done then
@@ -3229,6 +3285,7 @@ do
 end
 
 UI.generated_icons = {
+	purchase = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEcklEQVR4nKWXX2hcVRDGv7m7NiW1Jv1DQSyKfVAxRWM1hfggplSI+AdBEHzRNlSCL4roq9B3C0kVpLZS6ZOIT1UQEQQLqS1tY7W0pEVLq1WsaK0xxCR2sz8f7pzdyc1usosHlnP2nJlvvplz7sw5pjYbYJIySea/1KqSMLNqO3i2vEjNcKkVA4Fg1cz43wSAzA3j/9dJ6pG0RVK3i1UknZA0YWZXImkzm1/OxlLGS2H8GHAY+J3mbQo4CgwBK4oY7Rove78F+GIJo83aWeA5x8h8axa1hpNA2cwqwJCkUUmrw3JF0mlJ5yT96HPdkh6Q1CvplgLcqJm9VtzKVjx/yT2Z9/4v4C3gviV0NwJvABdcZ877/Qm7WSQSQMn7FwsAY8BdQc6AUgJz4CysdwEHXHfG+33RRiPjmQP3AtPAv654IESl7HKZj7uAO31ccv1ywBx2jFnvh5qSSB4AR8JBOh68TNGxMDcAjDXAqBEBRhyr4tu4LmIUQ78t7Ps1YFMKdwL2vhPYCXwJ/A3sAe5tRMIjcxKoOvbuRVEIBj4L3u9JYS9s0R3Ady5zAfgN+NW3bLCAl3Qfd/kqcBXoqjkUvFoP/OmCM0CPG8wKnn3qMpuBR8gPaBn4wUPclUIcfp3UvwyA7YlopjxvS9I9qqfWCTM7J0lmVgXM+05J2yV9a2ZnJW2QtMrMKpL2Ks8rff6tZ96XzOwfSZ+HI7fV+ywS6FM9MZ1OAlrYkDQrab3/vy6p4qF+X9LtksaceK0GeJTHA05fWooG1obxZe/NwSAvLDOSDkvaCLyrvCjdMLOKmc2Y2aSZzRZJeyQuh7lkq/7NSopVq1G2qronryvfqpd9fgr4QNI7ZvYNkDUp2RGzZitGoBLGaxZpew43s2tm9oykRyV9LGmlpB2SxoFX/KwUt05aGOEbkUBieyoIPOT9Ak/CnaBsZkckved6fZKuStoL9BZIJM8fDFDpPGSZ8oMl5dVt2sc9wK25rXrGAjqAbkmZH7wuSR1mdkrSm441GJyT8q0rSRpoQCDfL2f7i6QJB1kj6fn0GYWsNSjpkqQX/NNLieYmSeddtzMQLvnc/ZL6fTwt6WsXmY+CAnZ4opj3xLHKU2la3+TrF4GbPREd87W3fW1bwnRiAj4KSehQtJkIGHmqXQF8Tz1vH0wehrT6qq/9AXwF/ET9xjTqMhn1K9lOX6v47+4ko9iCl8+6Qiqhw4Fk8mgAOORkp4BPgCeD54nsVvLSnu4VI4u8b0JixBXSZWIkgMZD+QRwpqjv413AJPV7xTEn1/R+WKzj+10xsT8OPA10BPmVhJuSz/UDH4awA5wA1lK8B6hBxnOBVHz2SRouiJxXXljOSLooaU7SbcrfCQOSHna5qvJP8aikp8zsOs2zZMNIpO3YRV7z221zvnXp3DTKjssSSXeADcBu4EoLhieBg8DmQlQbtlaeZrXnFbBaeS3vV+On2bikk2b2c9JVi2/E5UjUtqRF+VKrIW/5dZyIKD9YsYillupKtZ0n+n/9GaK06iyrEwAAAABJRU5ErkJggg==",
 	arrow = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABP0lEQVR4Xu2WQW7CMBBFaSmbchkkNpRTsOyNKiG4AexAbHuDnqvQ9qFBMzAYnNpOKnXhL0XJIv7/z/eMk16voqLivwJ4BPpt/RXxyCITBh7kKjES8mRxAGPgxRtJJVDTpyKyeMwxMOeCjRGmJKHvPqn4IuAZ+FSu4MSlcsE3cNDnnRI2mgjEl7r2y/HMlOe2t6zhgKkuFPEfYJ9iIiIua4XjUzle1cApoRtYxwJbXWDijSYi4pae3T+AoWrc7yff8cAuxUSG+LNW39zMQQenmBgose35vcpN/Dzejcgx0bl4cADZLMeSWANvrmkFfs/zKg/xSxIypgZ77k48MQkRljnvtvKMJGTGBTamMmrtYo8hsh0+gb8TD7bDZn/leuBdDhk7rlM/WkXwHyRgBEy8wSLSEnT1z9AKRX87FRUVAY5f1FQ4mmZyTQAAAABJRU5ErkJggg==",
 	create = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADK0lEQVR42rWXT4hPURTHv++9H9NMI38iapIFKckCvyxnY7JQrKRGydKCFDUkrLARokyxQcrULBUhNopmIhYYC0IooQmZYsb8fu9jc16drvd+836/4dTtvXvvueec++97vjcCNA2J7Nuykco0HEeSUqvH9k2bNRS3GDTmLLGSWqm4VSk3kya2IHOEpPmSjkpaLGnM+vokvXO69VJWgalKDCTufyfwgb/lK3AA6HC68VT2G3VGzrGA9cBw4PRpTtsLYIsbl5itpgLwjpcDVwMn34HDQLvp7AI+Bjo3gKqzUykbQBbtLOAo8MMZTYErwNIc/UXAWWDc6f8Gzlmf8lYib78FbAdeBzO6D3QHM4pyZrfaZu/lE7DH9KOiADIj+4IZjAC9bluSgsMVBYFsBIbMRiZ94Rbn4UDVrtu43emPkh64axUVAA5WMhwYkvTG6hM2flOInHkB/LL2GQYsPZJeSjopaZ6kmhlNAkCLzUm7pEPmfJvZaDP9341wIFu+i7Zcn4HTduIzeWs4ELul9Mu+FXju9CeAfuCV1e8EZ61hAF+svgwYsBuQyZDhQja2CtwKDt51YK31P2s1gAWuv8cce7lkV2/CtT3PAaIXrQYw15QrARS/z4HiUWC/g2J/W0aKAiiTDVM7XImd3guS1kjqlzRpZVDSWkknJP0MMuQ/S8d1C2CmpFFJx91tOWWZsM1uSP1/8oHsGs51bbPNVq1ZdhSX4ABRAejUg9VJm7RRGEDqnHyzb9LCSsVuO2pFlC0vgA4b1Clptzmv2TcuyRcTd2Z6JXVZvaNMAI/NQIekM5KGJW1wy1zE+yLHF+uS1km6K2nAIDyRdDNg07npOAIOBhAMMGjkJNNdCdSsr8e1dwHngUk3dhw46VJ4VIaQLAEuBxD8AzgOdAILgbq1Vy34PsshXq4Bq5qlZD7BdAP3AqMvgSM2sxQ4BjwKdJ4Am1uhZHlsWMAOy4YEFC2Uz8BeYEYZdlyGlntWO8dmO+YCyLZh0vhfVwG5bTmAPGMr7FBmchtYV8AXG5aoycdp5HBBlpQqkh7mvJ7++dMsDz/Sgseq/ncAHufVTPYL5Q+CWwwu/Uow7QAAAABJRU5ErkJggg==",
 	kick = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACFElEQVR42sWXv2oVQRTGfzO7in8wjZhaRDBaaqWFCEG7FCHEytaXyBv4EFZWon20EBsRRexEUoilBCyUQHJzk707KfwWxnV2d3Z2r/fAYe7dnZnzzTnfOXPWOOdYpOQNzy1gItbP5gHAAOWiPGAAB1wBLut3myc+AAfeukEArDa5CnwGliLWXwd2hgCwDadfAo4j1pt5cOBYQHLgKfBOQCte+GH54T0blYSVgdfAi4h9XCCUbkgaVnJBc3KgaEjDuqGyFtJoDoSklOEmdQE+XAuEKhlAH8k0PgZextqwc6gtv4EN4JlAlW12bOJJ2zQXNx4Br4BzApGNBWDWoFONhzI2AVaBbWBZ77K+WRCafxs41eCZGbCi/6dF1LvAW4HZrdWUaADGS8tt4HwPUhbADd0bD4FPPoi+ITDA2YQ1AJd0gL9KeKwHqnw/ALaAMw18KoF70lKay/WrwFfNm6Vy4BB40jFnIgBTeWsHWNf4T0XNE7Igb3leiB+ljH8B7ssDwXKeAqDoeHckN78BNoFfImSRchmlyEXgPbCmcGRtveOYpbgy8lxun9QJl+IB65VY19EVV+8/9mluuwDse6W2T5s3qCHxF98EfrbEMdQV92vpnXOVZhofuD8ydd2yojXW26eX2trJDfAd2NNl8l+74lIbfgNuAXc8AyYAdJSu2AQ+Ts2QDccoq05MtpG5PwisWfTn+QlNG/hXgj94kgAAAABJRU5ErkJggg==",
@@ -4142,6 +4199,10 @@ local function display_path(Log, context)
 end
 
 local function arg_code(Log, index, depth, context)
+	if index == 1 and Log.Kind == "purchase" and type(Log.Args[1]) == "number" and players.LocalPlayer and Log.Args[1] == players.LocalPlayer.UserId then
+		return 'game:GetService("Players").LocalPlayer.UserId'
+	end
+
 	local dyn = Settings.AutoFill and Log.Args.Dyn
 	if dyn and dyn[index] and __R.dyn_code[dyn[index]] then
 		return __R.dyn_code[dyn[index]]
@@ -4191,7 +4252,7 @@ UI.tidy = function(code)
 	local code, players = string.gsub(code, 'game:GetService%("Players"%)%.LocalPlayer', "lp")
 	code = string.gsub(code, 'game:GetService%("([%w_]+)"%)', function(Name)
 		use(Name)
-		return (string.lower(string.gsub(Name, "(%l)(%u)", "%1_%2")))
+		return (Name == "MarketplaceService" and "market_place" or string.lower(string.gsub(Name, "(%l)(%u)", "%1_%2")))
 	end)
 
 	local need_lp = characters > 0 or players > 0
@@ -4213,7 +4274,7 @@ UI.tidy = function(code)
 
 	local lines = {"local get_service = game.GetService"}
 	for _, Name in services do
-		table.insert(lines, "local " .. string.lower(string.gsub(Name, "(%l)(%u)", "%1_%2")) .. " = get_service(game, '" .. Name .. "')")
+		table.insert(lines, "local " .. (Name == "MarketplaceService" and "market_place" or string.lower(string.gsub(Name, "(%l)(%u)", "%1_%2"))) .. " = get_service(game, '" .. Name .. "')")
 	end
 
 	if need_lp then
@@ -5414,6 +5475,10 @@ function __R.generate_raw(Log)
 	local Unpack = Settings.Unpack
 	local count = Log.Count
 	local kind = Log.Kind
+	if kind == "purchase" then
+		target = 'game:GetService("MarketplaceService")'
+	end
+
 	if kind == "raknet" then
 		return UI.raknet_code(Log)
 	end
@@ -5423,7 +5488,7 @@ function __R.generate_raw(Log)
 	end
 
 	if Settings.RemoteVariable and kind ~= "require" and kind ~= "debuginfo" and kind ~= "create" and kind ~= "lib" and kind ~= "wait" then
-		local variable = (kind == "kick" and "player") or (kind == "corestate" and "starterGui") or (kind == "teleport" and "teleportService") or (kind == "bindable" and "bindable") or (Log.Signal and "signal") or (kind == "prompt" and "prompt") or (kind == "touch" and "part") or (kind == "click" and "detector") or (kind == "tool" and "tool") or (kind == "actormsg" and "actor") or "remote"
+		local variable = (kind == "kick" and "player") or (kind == "corestate" and "starterGui") or (kind == "teleport" and "teleportService") or (kind == "purchase" and "marketplaceService") or (kind == "bindable" and "bindable") or (Log.Signal and "signal") or (kind == "prompt" and "prompt") or (kind == "touch" and "part") or (kind == "click" and "detector") or (kind == "tool" and "tool") or (kind == "actormsg" and "actor") or "remote"
 		table.insert(setup, "local " .. variable .. " = " .. target)
 		target = variable
 	end
@@ -5791,6 +5856,15 @@ end]=],
 		call ="fireproximityprompt(" .. target .. (arg_text ~= "" and (", " .. arg_text) or "") .. ")"
 	elseif kind == "connection" then
 		call = target .. ":" .. Log.Method .. "(" .. arg_text .. ")"
+	elseif kind == "purchase" then
+		local method_name = Log.Method
+		if string.find(method_name, "Finished$") and not string.find(method_name, "^Signal") then
+			call = "firesignal(" .. target .. "." .. method_name .. (arg_text ~= "" and (", " .. arg_text) or "") .. ")"
+		elseif method_name == "UserOwnsGamePassAsync" or method_name == "PlayerOwnsAsset" then
+			call = "local owns = " .. target .. ":" .. method_name .. "(" .. arg_text .. ")\n\nprint(owns)"
+		else
+			call = target .. ":" .. method_name .. "(" .. arg_text .. ")"
+		end
 	elseif Log.Signal then
 		call = kind .. "(" .. target .. (arg_text ~= "" and (", " .. arg_text) or "") .. ")"
 	elseif Settings.CallViaFunction and Log.Info and not Log.Actor and (kind == "event" or kind == "unreliable" or kind == "function") then
@@ -5935,6 +6009,12 @@ end]=],
 		table.insert(header, "-- incoming (server -> client): replays the event on your client")
 	elseif kind == "kick" then
 		table.insert(header, "-- a kick the game tried on you")
+	elseif kind == "purchase" then
+		table.insert(header, "-- MarketplaceService call (ownership check / purchase prompt)")
+		local names = UI.purchase_arg_names[(string.gsub(Log.Method, "^Signal", ""))]
+		if names then
+			table.insert(header, "-- args: " .. names)
+		end
 	elseif kind == "connection" then
 		table.insert(header, "-- the game connected a function to this signal" .. (Log.Owner and "" or " (signal owner not found, set it yourself)"))
 	elseif Log.Signal then
@@ -7147,7 +7227,12 @@ Button(UI.hook_bar, "close", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum
 
 function __R.open_hook(Log)
 	local remote = Log.Remote
-	local hookable = Log.Kind == "event" or Log.Kind == "unreliable" or Log.Kind == "function" or Log.Kind == "bindable"
+	local hookable = Log.Kind == "event" or Log.Kind == "unreliable" or Log.Kind == "function" or Log.Kind == "bindable" or Log.Kind == "purchase"
+	if Log.Kind == "purchase" then
+		UI.purchase_hook_method = UI.purchase_hook_method or { }
+		UI.purchase_hook_method[remote] = Log.Method
+	end
+
 	if typeof(remote) ~= "Instance" or not hookable then
 		set_status("only remote / bindable calls can be hooked")
 		return
@@ -7494,6 +7579,19 @@ local function replay(Log)
 
 		if Log.Kind == "connection" then
 			set_status("a connection can't be replayed (the callback is the game's own function)")
+			return
+		end
+
+		if Log.Kind == "purchase" and string.find(Log.Method, "Finished$") and not string.find(Log.Method, "^Signal") then
+			if not X.FireSignal then
+				set_status("no firesignal in this executor")
+				return
+			end
+
+			replaying = true
+			ok, result = pcall(function() return X.FireSignal(Log.Remote[Log.Method], table.unpack(args, 1, Log.Count)) end)
+			replaying = false
+			set_status(ok and ("fired " .. Log.Method) or ("run failed: " .. tostring(result)))
 			return
 		end
 
@@ -9292,6 +9390,42 @@ do
 	end
 end
 
+do
+	local ok, market = pcall(function() return clone_ref(game.GetService(game, "MarketplaceService")) end)
+	if ok and market then
+		for _, Name in {"PromptProductPurchaseFinished", "PromptGamePassPurchaseFinished", "PromptPurchaseFinished", "PromptBundlePurchaseFinished", "PromptPremiumPurchaseFinished"} do
+			pcall(function()
+				local handler
+				handler = function(...)
+					if not active or paused or replaying or not Settings.Purchases or ignored[market] or name_ignored(Name) then
+						return
+					end
+
+					local listener = nil
+					if getconnections then
+						local got, list = pcall(getconnections, market[Name])
+						for _, Conn in got and list or { } do
+							local Fn = Conn.Function
+							if Fn and not UI.own_callbacks[Fn] then
+								local ok_env, fenv = pcall(getfenv, Fn)
+								local scr = ok_env and type(fenv) == "table" and rawget(fenv, "script")
+								if typeof(scr) == "Instance" then
+									listener = scr
+									break
+								end
+							end
+						end
+					end
+
+					push(market, Name, "purchase", listener, nil, select("#", ...), ...)
+				end
+				UI.own_callbacks[handler] = true
+				Connect(market[Name], handler)
+			end)
+		end
+	end
+end
+
 UI.watched_clicks = setmetatable({ }, {__mode = "k"})
 task.spawn(function()
 	local ok, all = pcall(game.GetDescendants, game)
@@ -10803,6 +10937,7 @@ for key, icon in {
 	GetAttributes = "getattr", SetAttributes = "setattr", AttrAntiSpam = "setattr", Sounds = "sound", Waits = "wait", RakNet = "raknet", RakNetReceive = "raknet", Tables = "tables", Buffers = "buffers", LogService = "logservice", LogBacklog = "logservice",
 	ParentNil = "parentnil", LogReaders = "logservice", Prompts = "prompt", InstantPrompts = "prompt", AutoPrompts = "prompt", Touches = "touch", ToolOnlyWired = "touch", TouchAll = "touch",
 	GuiClicks = "guiclick", Clicks = "click", Tools = "tool", ActorMessages = "actormsg", Actors = "actors", WatchActors = "actors",
+	Purchases = "purchase", BlockPurchases = "purchase", OwnsSpoof = "purchase",
 	BlockKicks = "kick", BlockCoreState = "corestate", BlockTeleports = "teleport", BlockShutdowns = "shutdown", BlockCreates = "create", BlockInstanceNew = "instancenew", BlockSounds = "sound",
 	BlockGetAttributes = "getattr", BlockSetAttributes = "setattr", BlockWaits = "wait", BlockPrint = "logservice", BlockWarn = "logservice", BlockError = "logservice", BlockTables = "tables",
 	BlockBuffers = "buffers", BlockLogReaders = "logservice", BlockTools = "tool",
@@ -11116,6 +11251,7 @@ end
 
 	check(extra, "Reset / inventory toggles (SetCore, SetCoreGuiEnabled)", "CoreState")
 	check(extra, "Teleports (TeleportService)", "Teleports")
+	check(extra, "Purchases (UserOwnsGamePassAsync, prompts, PurchaseFinished)", "Purchases")
 	check(extra, "game:Shutdown()", "Shutdowns")
 	check(extra, "buffer.create / table.create", "Creates")
 	check(extra, "Instance.new", "InstanceNew", function() UI.set_instance_new() end)
@@ -11410,6 +11546,8 @@ end
 	check(blocking, "Block kicks", "BlockKicks")
 	check(blocking, "Block reset / inventory being disabled", "BlockCoreState")
 	check(blocking, "Block teleports", "BlockTeleports")
+	check(blocking, "Block PurchaseFinished signals (prompts are never blocked)", "BlockPurchases")
+	choice(blocking, "  gamepass / asset ownership returns", "OwnsSpoof", {"off", "true", "false"})
 	check(blocking, "Block shutdown", "BlockShutdowns")
 	check(blocking, "Block buffer.create / table.create", "BlockCreates")
 	check(blocking, "Block Instance.new (game gets a Folder)", "BlockInstanceNew", function() UI.set_instance_new() end)
