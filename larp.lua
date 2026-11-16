@@ -154,7 +154,7 @@ local Settings = {
 	MaxLogs = 300,
 	Stack = "remote",
 	StackToTop = false,
-	HistoryLimit = 50,
+	HistoryLimit = 500,
 	IgnoreNames = "",
 	OnlyNames = "",
 	AutoCopy = false,
@@ -193,6 +193,8 @@ local Settings = {
 	BlockInstanceNew = false,
 	Waits = false,
 	BlockWaits = false,
+	RakNet = false,
+	RakNetReceive = false,
 	WaitMap = "",
 	AntiSpam = false,
 	AntiSpamWindow = 1,
@@ -270,6 +272,8 @@ local Settings = {
 	UpvalueDeep = true,
 	UpvalueArgs = "all",
 	DebugInfo = false,
+	DebugStack = true,
+	RemoteStack = false,
 	DecodeBuffers = false,
 	BufferHeader = 1,
 	BufferLayouts = "",
@@ -575,6 +579,7 @@ local kinds = {
 	setattr = {Tag = "setattr", Color = rgb(255, 180, 140)},
 	sound = {Tag = "sound", Color = rgb(255, 140, 200)},
 	wait = {Tag = "wait", Color = rgb(210, 210, 130)},
+	raknet = {Tag = "raknet", Color = rgb(255, 130, 130)},
 	actormsg = {Tag = "actor", Color = rgb(120, 190, 255)},
 	http = {Tag = "http", Color = rgb(110, 160, 255)},
 }
@@ -1413,7 +1418,7 @@ end
 
 function __R.caller_info()
 	local raw = UI.stack_raw(raw_debug_info or debug.info)
-	local ok_own, own = true, raw(1, "s")
+	local ok_own, own = true, __R.own_source()
 	local first
 	for level = 2, 14 do
 		local ok, source, line, Name, params, vararg = pcall(raw, level, "slna")
@@ -1433,6 +1438,44 @@ function __R.caller_info()
 	end
 
 	return first
+end
+
+-- source name of the spy's own chunk (read straight from debug.info so the oth wrapper can't blank it)
+__R.own_source = function()
+	local raw = raw_debug_info or debug.info
+	return raw(1, "s")
+end
+
+-- every game frame between debug.info and the bottom of the stack (spy, executor and C frames skipped), innermost first
+function __R.full_stack(limit)
+	local raw = UI.stack_raw(raw_debug_info or debug.info)
+	local own = __R.own_source()
+	local is_executor = isexecutorclosure or is_executor_closure or checkclosure or is_synapse_function
+	local frames = { }
+	for level = 2, limit or 40 do
+		local ok, source, line, Name, params, vararg, Function = pcall(raw, level, "slnaf")
+		if not ok or source == nil then
+			break
+		end
+
+		local mine = source == "[C]" or source == own
+		if not mine and is_executor and type(Function) == "function" then
+			local ok_exec, executor = pcall(is_executor, Function)
+			mine = ok_exec and executor == true
+		end
+
+		if not mine then
+			table.insert(frames, {
+				Source = source,
+				Line = line,
+				Name = (Name and Name ~= "") and Name or nil,
+				Params = params,
+				Vararg = vararg,
+			})
+		end
+	end
+
+	return frames
 end
 
 UI.find_upvalues = function(args, count)
@@ -1741,7 +1784,13 @@ local replaying = false
 local click_fired = setmetatable({ }, {__mode = "k"})
 __R.prompt_fired = setmetatable({ }, {__mode = "k"})
 
+UI.frozen = UI.frozen or setmetatable({ }, {__mode = "k"})
+
 local function push(remote, Method, kind, script, Actor, count, ...)
+	if UI.frozen[remote] then
+		return
+	end
+
 	if Actor == nil and kind ~= "incoming" then
 		Actor = UI.actor_of_call(script)
 	end
@@ -1769,7 +1818,7 @@ local function push(remote, Method, kind, script, Actor, count, ...)
 	end
 
 	args.Dyn = __R.detect_dynamic(args, count)
-	if Settings.UpvalueSearch and kind ~= "http" and kind ~= "lib" and kind ~= "wait" and kind ~= "logservice" then
+	if Settings.UpvalueSearch and kind ~= "http" and kind ~= "lib" and kind ~= "wait" and kind ~= "raknet" and kind ~= "logservice" then
 		local ok_up, up = pcall(UI.find_upvalues, args, count)
 		args.Up = ok_up and up or nil
 		if not args.Up then
@@ -1805,12 +1854,39 @@ local function push(remote, Method, kind, script, Actor, count, ...)
 		end
 	end
 
+	local CallerInfo = kind ~= "raknet" and (Settings.DebugInfo or Settings.RemoteStack) and __R.caller_info() or nil
+	if Settings.RemoteStack and kind ~= "debuginfo" and kind ~= "raknet" and not shared.StackBusy then
+		local now = os.clock()
+		UI.stack_last = UI.stack_last or setmetatable({ }, {__mode = "k"})
+		local key = typeof(remote) == "Instance" and remote or kind
+		UI.stack_cache = UI.stack_cache or setmetatable({ }, {__mode = "k"})
+		local stack = nil
+		if now - (UI.stack_last[key] or 0) >= 0.05 then
+			UI.stack_last[key] = now
+			shared.StackBusy = true
+			local ok_stack, got = pcall(__R.full_stack, 12)
+			shared.StackBusy = false
+			if ok_stack and type(got) == "table" and #got > 0 then
+				stack = got
+				UI.stack_cache[key] = got
+			end
+		else
+			stack = UI.stack_cache[key]
+		end
+
+		if stack then
+			local top = stack[1]
+			CallerInfo = CallerInfo or {Source = top.Source, Line = top.Line, Name = top.Name, Params = top.Params, Vararg = top.Vararg}
+			CallerInfo.Stack = stack
+		end
+	end
+
 	table.insert(queue, {
 		Remote = remote,
 		Method = Method,
 		Kind = kind,
 		Script = script,
-		Info = Settings.DebugInfo and __R.caller_info() or nil,
+		Info = CallerInfo,
 		Actor = Actor,
 		Args = args,
 		Count = count,
@@ -2802,6 +2878,15 @@ shared.capture_debug_info = function(results, ...)
 	pcall(function()
 		local script = X.get_calling_script()
 		local Info = __R.caller_info()
+		if Settings.DebugStack and not paused then
+			local ok_stack, stack = pcall(__R.full_stack, 25)
+			if ok_stack and type(stack) == "table" and #stack > 0 then
+				local top = stack[1]
+				Info = Info or {Source = top.Source, Line = top.Line, Name = top.Name, Params = top.Params, Vararg = top.Vararg}
+				Info.Stack = stack
+			end
+		end
+
 		local ok_name, script_name = pcall(function() return script.Name end)
 		local ok_path, script_path = pcall(function() return script.GetFullName(script) end)
 		local where = (ok_name and script_name) or (Info and string.match(tostring(Info.Source), "[^%.]+$")) or "unknown"
@@ -2838,7 +2923,12 @@ shared.capture_debug_info = function(results, ...)
 		end
 
 		if not paused and not ignored[key] and not name_ignored("debug.info") then
+			local before = #queue
 			push(key, "info", "debuginfo", script, nil, count, table.unpack(args, 1, count))
+			if Settings.DebugStack and Info and #queue > before then
+				queue[#queue].Info = Info
+			end
+
 			queue[#queue].Result = results
 			queue[#queue].Label = label
 			queue[#queue].Spoofed = spoof ~= nil
@@ -3212,12 +3302,61 @@ local tabs = New("Frame", {Parent = UI.title_bar, Position = UDim2.new(0, UI.cla
 HorizontalList(tabs, 4)
 local status = Text(UI.title_bar, {AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, UI.classic and -52 or -66, 0, 0), Size = UDim2.new(0, 280, 1, 0), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = T.Dim, Text = hook_status})
 
+UI.tabs_compact = false
+UI.tab_full_text = { }
+
 UI.fit_status = function()
 	local layout = tabs.FindFirstChildOfClass(tabs, "UIListLayout")
 	local used = layout and layout.AbsoluteContentSize.X or 0
 	local right = -status.Position.X.Offset
+
+	-- too narrow for the tab names: show only the icons so the tabs never run into the minimize / close buttons
+	if not UI.tabs_compact then
+		UI.tabs_full = used
+	end
+
+	local available = UI.title_bar.AbsoluteSize.X - tabs.Position.X.Offset - right - 8
+	local want_compact = (not UI.classic) and available > 0 and (UI.tabs_full or used) > available
+	if want_compact ~= UI.tabs_compact and UI.tab_buttons then
+		UI.tabs_compact = want_compact
+		for Name, object in UI.tab_buttons do
+			local pad = object.FindFirstChildOfClass(object, "UIPadding")
+			if object.FindFirstChild(object, "TabIcon") then
+				if want_compact then
+					UI.tab_full_text[Name] = UI.tab_full_text[Name] or object.Text
+					object.Text = ""
+					object.AutomaticSize = Enum.AutomaticSize.None
+					object.Size = UDim2.new(0, 30, 1, 0)
+					if pad then
+						pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 0), UDim.new(0, 0)
+					end
+
+					local icon = object.FindFirstChild(object, "TabIcon")
+					icon.AnchorPoint = Vector2.new(0.5, 0.5)
+					icon.Position = UDim2.new(0.5, 0, 0.5, 0)
+				else
+					object.Text = UI.tab_full_text[Name] or object.Text
+					object.AutomaticSize = Enum.AutomaticSize.X
+					object.Size = UDim2.new(0, 0, 1, 0)
+					if pad then
+						pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 26), UDim.new(0, 12)
+					end
+
+					local icon = object.FindFirstChild(object, "TabIcon")
+					icon.AnchorPoint = Vector2.new(0, 0)
+					icon.Position = UDim2.new(0, -15, 0.5, -6)
+				end
+			end
+		end
+
+		return
+	end
 	tabs.Size = UDim2.new(0, used, 0, tabs.Size.Y.Offset)
 	status.Size = UDim2.new(1, -(tabs.Position.X.Offset + used + 16 + right), 1, 0)
+	status.ClipsDescendants = true
+	status.TextTruncate = Enum.TextTruncate.AtEnd
+	local free = UI.title_bar.AbsoluteSize.X - (tabs.Position.X.Offset + used + 16 + right)
+	status.Visible = free > 60
 end
 
 do
@@ -3229,6 +3368,10 @@ do
 end
 
 UI.fit_status()
+do
+	local bar_changed = UI.title_bar.GetPropertyChangedSignal(UI.title_bar, "AbsoluteSize")
+	bar_changed.Connect(bar_changed, UI.fit_status)
+end
 
 local function set_status(Message)
 	if not pcall(function() status.Text = Message end) then
@@ -3653,6 +3796,43 @@ local function path_of(object, context)
 	return result
 end
 
+-- debug.info(level, "s") gives a script's full name ("ReplicatedStorage.Modules.Foo"); turn that back into the instance
+__R.resolve_source = function(source)
+	if type(source) ~= "string" or source == "" then
+		return nil
+	end
+
+	local first = string.sub(source, 1, 1)
+	if first == "[" or first == "=" or first == "@" then
+		return nil
+	end
+
+	local current = game
+	local text = string.gsub(source, "^game%.", "")
+	for part in string.gmatch(text, "[^%.]+") do
+		local ok, nxt = pcall(function() return current.FindFirstChild(current, part) end)
+		if not ok or not nxt then
+			return nil
+		end
+
+		current = nxt
+	end
+
+	return current ~= game and current or nil
+end
+
+UI.frame_path = function(source)
+	local instance = __R.resolve_source(source)
+	if instance then
+		local ok, path = pcall(path_of, instance)
+		if ok and path then
+			return path
+		end
+	end
+
+	return tostring(source)
+end
+
 local menu = New("ScrollingFrame", {
 	Parent = Gui,
 	Visible = false,
@@ -3669,6 +3849,8 @@ local menu = New("ScrollingFrame", {
 Accent(menu, "ScrollBarImageColor3")
 UI.Dual(Stroke(menu), "Border", "Outline")
 New("UIListLayout", {Parent = menu, SortOrder = Enum.SortOrder.LayoutOrder})
+
+UI.menu_frame = menu
 
 local function close_menu()
 	menu.Visible = false
@@ -3847,7 +4029,7 @@ local function display_name(Log)
 		return base
 	end
 
-	if Log.Kind == "create" or Log.Kind == "lib" or Log.Kind == "wait" then
+	if Log.Kind == "create" or Log.Kind == "lib" or Log.Kind == "wait" or Log.Kind == "raknet" then
 		return tostring(Log.Remote)
 	end
 
@@ -3910,6 +4092,10 @@ function __R.display_class(Log)
 
 	if Log.Signal then
 		return Log.Owner and (class_of(Log.Owner) .. " signal") or "signal"
+	end
+
+	if Log.Kind == "raknet" then
+		return "RakNet packet"
 	end
 
 	if Log.Kind == "create" or Log.Kind == "lib" or Log.Kind == "wait" then
@@ -5228,6 +5414,10 @@ function __R.generate_raw(Log)
 	local Unpack = Settings.Unpack
 	local count = Log.Count
 	local kind = Log.Kind
+	if kind == "raknet" then
+		return UI.raknet_code(Log)
+	end
+
 	if kind == "anim" and UI.anim_code then
 		return UI.anim_code(Log.Args[1])
 	end
@@ -5708,6 +5898,17 @@ end]=],
 		if Log.Info then
 			local Info = Log.Info
 			table.insert(header, string.format("-- caller function: %s  %s:%s  (%s param%s%s)", Info.Name or "<anonymous>", tostring(Info.Source), tostring(Info.Line), tostring(Info.Params or "?"), Info.Params == 1 and "" or "s", Info.Vararg and ", vararg" or ""))
+			if Info.Stack and #Info.Stack > 0 then
+				table.insert(header, "-- call stack (innermost first):")
+				for index, frame in Info.Stack do
+					if index > 15 then
+						table.insert(header, "--   ... " .. (#Info.Stack - 15) .. " more")
+						break
+					end
+
+					table.insert(header, string.format("--   %d. %s  %s:%s", index, frame.Name or "<anonymous>", UI.frame_path(frame.Source), tostring(frame.Line)))
+				end
+			end
 		end
 
 		if Log.Actor then
@@ -6645,7 +6846,8 @@ UI.info_name = Text(UI.details_panel, {Position = UDim2.new(0, 8, 0, 22), Size =
 UI.info_path = Text(UI.details_panel, {Position = UDim2.new(0, 8, 0, 35), Size = UDim2.new(1, -16, 0, 12), TextColor3 = T.Dim})
 UI.info_meta = Text(UI.details_panel, {Position = UDim2.new(0, 8, 0, 48), Size = UDim2.new(1, -16, 0, 12), TextColor3 = T.Dim})
 local actions = New("Frame", {Parent = UI.details_panel, Position = UDim2.new(0, 8, 0, 64), Size = UDim2.new(1, -16, 0, 40), BackgroundTransparency = 1})
-HorizontalList(actions, 4).Wraps = true
+UI.actions_list = HorizontalList(actions, 4)
+UI.actions_list.Wraps = true
 UI.caller_row = New("Frame", {Parent = UI.details_panel, Position = UDim2.new(0, 8, 0, 108), Size = UDim2.new(1, -16, 0, 18), BackgroundTransparency = 1, Visible = false})
 UI.history_row = New("Frame", {Parent = UI.details_panel, Position = UDim2.new(0, 8, 0, 108), Size = UDim2.new(1, -16, 0, 18), BackgroundTransparency = 1, Visible = false})
 UI.loop_row = New("Frame", {Parent = UI.details_panel, Position = UDim2.new(0, 8, 0, 108), Size = UDim2.new(1, -16, 0, 18), BackgroundTransparency = 1, Visible = false})
@@ -6653,6 +6855,34 @@ UI.loops = { }
 HorizontalList(UI.loop_row, 4)
 HorizontalList(UI.caller_row, 4)
 HorizontalList(UI.history_row, 4)
+
+-- the action buttons wrap onto more rows when the window is narrow (or more buttons exist), so everything under them is placed from their real height
+UI.relayout_details = function()
+	if not UI.code_scroll then
+		return
+	end
+
+	local height = math.max(40, UI.actions_list.AbsoluteContentSize.Y)
+	actions.Size = UDim2.new(1, -16, 0, height)
+	local Y = 64 + height + 4
+	for _, row in {UI.loop_row, UI.caller_row, UI.history_row} do
+		if row.Visible then
+			row.Position = UDim2.new(0, 8, 0, Y)
+			Y += 22
+		end
+	end
+
+	UI.code_scroll.Position = UDim2.new(0, 8, 0, Y + 2)
+	UI.code_scroll.Size = UDim2.new(1, -16, 1, -(Y + 10))
+end
+
+for _, row in {UI.loop_row, UI.caller_row, UI.history_row} do
+	row.ClipsDescendants = true
+end
+
+Connect(UI.actions_list.GetPropertyChangedSignal(UI.actions_list, "AbsoluteContentSize"), function()
+	UI.relayout_details()
+end)
 UI.code_scroll = New("ScrollingFrame", {
 	Parent = UI.details_panel,
 	Position = UDim2.new(0, 8, 0, 88),
@@ -6728,6 +6958,8 @@ local function show_source(title, source)
 	UI.viewer_scroll.CanvasPosition = Vector2.new(0, 0)
 	fill_code(UI.viewer_body, source, true)
 end
+
+UI.show_source = show_source
 
 local function decompile_caller(script)
 	if not script then
@@ -7277,6 +7509,9 @@ local function replay(Log)
 			replaying = false
 			set_status(ok and ("ran " .. Log.Kind .. " " .. Log.EventName) or ("run failed: " .. tostring(result)))
 			return
+		elseif Log.Kind == "raknet" then
+			UI.raknet_send(Log)
+			return
 		elseif (Log.Kind == "lib" and not UI.is_packet_log(Log)) or Log.Kind == "logservice" or Log.Kind == "wait" then
 			set_status(Log.Kind == "lib" and "table / buffer calls aren't run" or (Log.Kind == "wait" and "waits aren't run" or "output lines aren't run"))
 			return
@@ -7603,7 +7838,7 @@ UI.refresh_loop = function(Log)
 end
 
 UI.set_loop = function(Log, Bool)
-	if (Log.Kind == "lib" and not UI.is_packet_log(Log)) or Log.Kind == "logservice" or Log.Kind == "wait" then
+	if (Log.Kind == "lib" and not UI.is_packet_log(Log)) or Log.Kind == "logservice" or Log.Kind == "wait" or Log.Kind == "raknet" then
 		set_status("not looping a " .. kinds[Log.Kind].Tag .. " row")
 		return
 	end
@@ -7892,6 +8127,12 @@ action_button("Path", "copy path", 1, function(Log) copy(display_path(Log)) end)
 action_button("Run", "run", 2, function(Log) replay(viewed(Log)) end)
 action_button("Block", "block", 3, function(Log) set_blocked(Log.Remote, not blocked[Log.Remote]) end)
 action_button("Ignore", "ignore", 4, function(Log) set_ignored(Log.Remote, true) end)
+action_button("Freeze", "freeze", 4, function(Log)
+	if Log.Remote ~= nil then
+		UI.frozen[Log.Remote] = (not UI.frozen[Log.Remote]) or nil
+		show_details(Log)
+	end
+end)
 action_button("IgnoreArgs", "ignore args", 5, function(Log) UI.open_block_args(Log) end)
 action_button("BlockName", "block name", 6, function(Log)
 	local Name = UI.log_name(Log)
@@ -7906,6 +8147,9 @@ action_button("IgnoreName", "ignore name", 7, function(Log)
 		UI.set_ignored_name(Name, true)
 	end
 end)
+
+action_button("Decompile", "decompile stack", 8, function(Log) UI.decompile_stack(Log) end)
+action_buttons.Decompile.Visible = false
 
 action_button("CopyAll", "copy all", 5, function(Log)
 	local parts = { }
@@ -7989,20 +8233,80 @@ end)
 Button(UI.history_row, "<", {Size = UDim2.new(0, 20, 1, 0), LayoutOrder = 0}, function() view_call(current_index() - 1) end)
 Button(UI.history_row, ">", {Size = UDim2.new(0, 20, 1, 0), LayoutOrder = 1}, function() view_call(current_index() + 1) end)
 Button(UI.history_row, "latest", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 2}, function() view_call(math.huge) end)
-Button(UI.history_row, "history", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 3}, function()
+UI.history_match = function(record, label, query)
+	if string.find(string.lower(label), query, 1, true) then
+		return true
+	end
+
+	local parts = { }
+	for index = 1, record.Count or 0 do
+		local ok, text = pcall(function()
+			local arg = record.Args[index]
+			if type(arg) == "string" then
+				return arg
+			end
+
+			if typeof(arg) == "buffer" then
+				return buffer.tostring(arg)
+			end
+
+			return tostring(arg)
+		end)
+
+		if ok and text then
+			table.insert(parts, text)
+		end
+	end
+
+	local stack = record.Info and record.Info.Stack
+	if stack then
+		for _, frame in stack do
+			table.insert(parts, tostring(frame.Name or "") .. " " .. tostring(frame.Source))
+		end
+	end
+
+	return string.find(string.lower(table.concat(parts, " ")), query, 1, true) ~= nil
+end
+
+UI.open_history = function(query)
 	if not selected or not selected.History then
 		return
 	end
 
+	query = string.lower(query or "")
 	local options = { }
 	local current = current_index()
 	for index = #selected.History, 1, -1 do
 		local record = selected.History[index]
 		local caller = record.Script and ("  " .. name_of(record.Script)) or ""
-		table.insert(options, {"#" .. record.number .. "  " .. record.Time .. "  " .. record.Count .. " args" .. caller, function() view_call(index) end, index == current and T.Accent or nil})
+		local label = "#" .. record.number .. "  " .. record.Time .. "  " .. record.Count .. " args" .. caller
+		local exact = string.match(query, "^#(%d+)$")
+		if query == "" or (exact and record.number == tonumber(exact)) or (not exact and UI.history_match(record, label, query)) then
+			table.insert(options, {label, function() view_call(index) end, index == current and T.Accent or nil})
+		end
 	end
 
-	open_menu(options, 220)
+	open_menu(options, 260)
+	local menu_frame = UI.menu_frame
+	menu_frame.Size = UDim2.new(0, 260, 0, math.min(#options * 18 + 22, 280))
+	local box = Input(menu_frame, {Size = UDim2.new(1, 0, 0, 18)}, #options .. " shown - type + Enter to search")
+	box.LayoutOrder = 0
+	box.ZIndex = 52
+	box.Text = query
+	Connect(box.FocusLost, function(entered)
+		if entered then
+			UI.open_history(box.Text)
+			for _, child in menu_frame.GetChildren(menu_frame) do
+				if child.IsA(child, "TextBox") then
+					child.CaptureFocus(child)
+				end
+			end
+		end
+	end)
+end
+
+Button(UI.history_row, "history", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 3}, function()
+	UI.open_history("")
 end) end end
 
 UI.history_label = Text(UI.history_row, {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, TextColor3 = T.Dim, LayoutOrder = 4})
@@ -8176,7 +8480,7 @@ show_details = function(Log, keep_scroll)
 	end
 
 	local Y = 130
-	UI.loop_row.Visible = Log.Kind ~= "kick" and Log.Kind ~= "shutdown" and Log.Kind ~= "parentnil" and Log.Kind ~= "create" and (Log.Kind ~= "lib" or UI.is_packet_log(Log)) and Log.Kind ~= "wait" and Log.Kind ~= "logservice"
+	UI.loop_row.Visible = Log.Kind ~= "kick" and Log.Kind ~= "shutdown" and Log.Kind ~= "parentnil" and Log.Kind ~= "create" and (Log.Kind ~= "lib" or UI.is_packet_log(Log)) and Log.Kind ~= "wait" and Log.Kind ~= "logservice" and Log.Kind ~= "raknet"
 	UI.loop_row.Position = UDim2.new(0, 8, 0, 108)
 	if UI.refresh_loop then
 		UI.refresh_loop(Log)
@@ -8200,6 +8504,7 @@ show_details = function(Log, keep_scroll)
 
 	UI.code_scroll.Position = UDim2.new(0, 8, 0, Y + 2)
 	UI.code_scroll.Size = UDim2.new(1, -16, 1, -(Y + 10))
+	UI.relayout_details()
 	action_buttons.Block.Text = blocked[Log.Remote] and "unblock" or "block"
 	action_buttons.Block.TextColor3 = blocked[Log.Remote] and T.Bad or T.Text
 	local log_name = UI.log_name(Log)
@@ -8207,12 +8512,21 @@ show_details = function(Log, keep_scroll)
 	action_buttons.BlockName.TextColor3 = log_name and blocked_names[log_name] and T.Bad or T.Text
 	action_buttons.BlockName.Visible = log_name ~= nil
 	action_buttons.IgnoreName.Visible = log_name ~= nil
+	action_buttons.Decompile.Visible = Log.Info ~= nil and Log.Info.Stack ~= nil
+	action_buttons.Freeze.Text = UI.frozen[Log.Remote] and "unfreeze" or "freeze"
+	action_buttons.Freeze.TextColor3 = UI.frozen[Log.Remote] and T.Bad or T.Text
 	action_buttons.Run.Text = (Log.Kind == "incoming" and "fire locally") or (Log.Kind == "require" and "require & dump") or "run"
 	if Log.BindKey then
 		action_buttons.Run.Text ..= " [" .. Log.BindKey .. "]"
 	end
 
-	action_buttons.Run.Visible = Log.Kind ~= "kick" and Log.Kind ~= "shutdown" and Log.Kind ~= "parentnil" and Log.Kind ~= "create" and (Log.Kind ~= "lib" or UI.is_packet_log(Log)) and Log.Kind ~= "wait" and Log.Kind ~= "logservice"
+	if Log.Kind == "raknet" then
+		action_buttons.Block.Visible = false
+		action_buttons.BlockName.Visible = false
+		action_buttons.IgnoreArgs.Visible = false
+	end
+
+	action_buttons.Run.Visible = Log.Kind ~= "kick" and Log.Kind ~= "shutdown" and Log.Kind ~= "parentnil" and Log.Kind ~= "create" and (Log.Kind ~= "lib" or UI.is_packet_log(Log)) and Log.Kind ~= "wait" and Log.Kind ~= "logservice" and (Log.Kind ~= "raknet" or Log.Method == "send")
 	local ok, code = pcall(generate, call)
 	show_code(ok and code or ("-- couldn't generate code: " .. tostring(code)), not keep_scroll)
 	if ok and Settings.AutoCopy and not keep_scroll and X.SetClipboard then
@@ -10052,6 +10366,302 @@ UI.net_report = function()
 	set_status("network finder: " .. (ok and path or best.Caller.Name) .. " (" .. best.Entry.Count .. " modules), top 5 copied")
 end
 
+-- decompiles every game script in a log's call stack (e.g. the script holding updatePosition) and copies the result
+UI.decompile_stack = function(Log)
+	local decompile_fn = decompile
+	if not decompile_fn then
+		set_status("decompile stack: this executor has no decompile")
+		return
+	end
+
+	local Info = Log and Log.Info
+	if not (Info and Info.Stack) then
+		set_status("decompile stack: this log has no call stack (turn on debug.info: full call stack, then catch a new call)")
+		return
+	end
+
+	local order, frames_of = { }, { }
+	for _, frame in Info.Stack do
+		local instance = __R.resolve_source(frame.Source)
+		if instance and instance.IsA(instance, "LuaSourceContainer") then
+			if not frames_of[instance] then
+				frames_of[instance] = { }
+				table.insert(order, instance)
+			end
+
+			table.insert(frames_of[instance], (frame.Name or "<anonymous>") .. " (line " .. tostring(frame.Line) .. ")")
+		end
+	end
+
+	if #order == 0 then
+		set_status("decompile stack: no game scripts in this call stack")
+		return
+	end
+
+	set_status("decompile stack: decompiling " .. #order .. " script(s)...")
+	UI.show_source("call stack  (decompiling...)", "-- decompiling " .. #order .. " script(s) from the call stack...")
+	task.spawn(function()
+		local parts = { }
+		for index, Script in order do
+			if not active then
+				return
+			end
+
+			local ok_path, path = pcall(path_of, Script)
+			local ok, text = pcall(decompile_fn, Script)
+			table.insert(parts, table.concat({
+				"-- " .. string.rep("=", 60),
+				"-- " .. (ok_path and path or Script.Name),
+				"-- frames from the call stack: " .. table.concat(frames_of[Script], ", "),
+				"-- the line numbers above are bytecode lines; the text below is numbered differently, so search for the function name",
+				"-- " .. string.rep("=", 60),
+				(ok and type(text) == "string") and text or ("-- decompile failed: " .. tostring(text)),
+			}, "\n"))
+
+			set_status("decompile stack: " .. index .. " / " .. #order)
+			task.wait()
+		end
+
+		local report = table.concat(parts, "\n\n")
+		report = string.gsub(string.gsub(report, "\r\n", "\n"), "\t", "    ")
+		UI.show_source("call stack  (" .. #order .. " script" .. (#order == 1 and "" or "s") .. ")", report)
+		set_status("decompile stack: " .. #order .. " script(s) shown (use copy in the viewer to copy)")
+	end)
+end
+
+UI.debug_find_busy = false
+
+UI.debug_find_report = function(Title, lines, Total)
+	local report = Title .. "\n" .. table.concat(lines, "\n")
+	if X.SetClipboard then
+		pcall(X.SetClipboard, report)
+	else
+		print(report)
+	end
+
+	set_status(Title .. "  (" .. Total .. ")" .. (X.SetClipboard and ", copied to clipboard" or ", printed to the console"))
+end
+
+-- scans every running function: anything whose constants hold "debug" + "info", or that keeps debug.info in an upvalue
+UI.find_debug_info = function()
+	local get_gc = getgc
+	local get_constants = getconstants or (debug and debug.getconstants)
+	local get_upvalues = getupvalues or (debug and debug.getupvalues)
+	if not get_gc or not (get_constants or get_upvalues) then
+		set_status("find debug.info: needs getgc and getconstants / getupvalues")
+		return
+	end
+
+	if UI.debug_find_busy then
+		set_status("find debug.info: already searching")
+		return
+	end
+
+	UI.debug_find_busy = true
+	set_status("find debug.info: scanning running functions...")
+	task.spawn(function()
+		local ok_scan, scan_error = pcall(function()
+			local raw = raw_debug_info or debug.info
+			local own = raw(1, "s")
+			local targets = { }
+			local function add_target(Function)
+				if type(Function) == "function" then
+					targets[Function] = true
+				end
+			end
+
+			add_target(raw)
+			add_target(debug.info)
+			local game_debug = getrenv and getrenv().debug
+			add_target(game_debug and game_debug.info)
+			local is_executor = isexecutorclosure or is_executor_closure or checkclosure or is_synapse_function
+			local found, seen = { }, { }
+			local scanned = 0
+			for _, Function in get_gc(true) do
+				scanned += 1
+				if scanned % 2500 == 0 then
+					task.wait()
+					if not active then
+						return
+					end
+				end
+
+				if type(Function) == "function" and not X.is_c(Function) and not (is_executor and is_executor(Function)) then
+					local how
+					if get_constants then
+						local ok, constants = pcall(get_constants, Function)
+						if ok and type(constants) == "table" then
+							local has_debug, has_info = false, false
+							for _, constant in constants do
+								if constant == "debug" then
+									has_debug = true
+								elseif constant == "info" then
+									has_info = true
+								end
+							end
+
+							if has_debug and has_info then
+								how = "constants: debug + info"
+							end
+						end
+					end
+
+					if not how and get_upvalues then
+						local ok, upvalues = pcall(get_upvalues, Function)
+						if ok and type(upvalues) == "table" then
+							for _, Value in upvalues do
+								if targets[Value] then
+									how = "upvalue: debug.info"
+									break
+								end
+							end
+						end
+					end
+
+					if how then
+						local ok, source, line, Name = pcall(raw, Function, "sln")
+						if ok and source and source ~= own and source ~= "[C]" then
+							local key = tostring(source) .. "|" .. tostring(line) .. "|" .. tostring(Name)
+							if not seen[key] then
+								seen[key] = true
+								table.insert(found, {Source = source, Line = line, Name = (Name and Name ~= "") and Name or nil, How = how})
+							end
+						end
+					end
+				end
+			end
+
+			if #found == 0 then
+				set_status("find debug.info: nothing in " .. scanned .. " objects (the caller may be Roblox / executor code, or not loaded yet; try the call stack option)")
+				return
+			end
+
+			table.sort(found, function(A, B)
+				if A.Source ~= B.Source then
+					return tostring(A.Source) < tostring(B.Source)
+				end
+
+				return (tonumber(A.Line) or 0) < (tonumber(B.Line) or 0)
+			end)
+
+			UI.debug_finds = found
+			local lines = { }
+			for index, item in found do
+				if index > 150 then
+					table.insert(lines, "... " .. (#found - 150) .. " more")
+					break
+				end
+
+				table.insert(lines, string.format("%d. %s  ->  %s:%s  (%s)", index, item.Name or "<anonymous>", UI.frame_path(item.Source), tostring(item.Line), item.How))
+			end
+
+			UI.debug_find_report("debug.info used by " .. #found .. " function(s)", lines, #found .. " found")
+		end)
+
+		UI.debug_find_busy = false
+		if not ok_scan then
+			set_status("find debug.info failed: " .. tostring(scan_error))
+		end
+	end)
+end
+
+-- decompiles every LocalScript / ModuleScript and looks for debug.info (or debug["info"]) in the text
+UI.search_debug_info_source = function()
+	local decompile_fn = decompile
+	if not decompile_fn then
+		set_status("search debug.info: this executor has no decompile")
+		return
+	end
+
+	if UI.debug_find_busy then
+		set_status("search debug.info: already searching")
+		return
+	end
+
+	UI.debug_find_busy = true
+	set_status("search debug.info: collecting scripts...")
+	task.spawn(function()
+		local ok_scan, scan_error = pcall(function()
+			local list = { }
+			local ok_all, all = pcall(function()
+				return getinstances and getinstances() or game.GetDescendants(game)
+			end)
+
+			if ok_all and type(all) == "table" then
+				for index, object in all do
+					if index % 1000 == 0 then
+						task.wait()
+					end
+
+					local ok_class, wanted = pcall(function()
+						return (object.IsA(object, "LocalScript") or object.IsA(object, "ModuleScript")) and not object.IsDescendantOf(object, core_gui)
+					end)
+
+					if ok_class and wanted then
+						table.insert(list, object)
+						if #list >= 3000 then
+							break
+						end
+					end
+				end
+			end
+
+			local total = #list
+			local lines, hits, scripts_hit = { }, 0, 0
+			for index, Script in list do
+				if not active then
+					return
+				end
+
+				if index % 5 == 0 then
+					set_status(string.format("search debug.info: decompiling %d / %d  (%d hits)", index, total, hits))
+				end
+
+				local ok, text = pcall(decompile_fn, Script)
+				if ok and type(text) == "string" then
+					local line_number, matched = 0, 0
+					for line in string.gmatch(text .. "\n", "(.-)\r?\n") do
+						line_number += 1
+						if string.find(line, "debug%s*%.%s*info") or string.find(line, "debug%s*%[%s*[\"']info[\"']%s*%]") then
+							matched += 1
+							hits += 1
+							if matched <= 10 then
+								local shown = string.match(line, "^%s*(.-)%s*$")
+								if #shown > 120 then
+									shown = string.sub(shown, 1, 120) .. "..."
+								end
+
+								local ok_path, path = pcall(path_of, Script)
+								table.insert(lines, string.format("%s:%d   %s", ok_path and path or Script.Name, line_number, shown))
+							end
+						end
+					end
+
+					if matched > 0 then
+						scripts_hit += 1
+					end
+				end
+
+				if index % 3 == 0 then
+					task.wait()
+				end
+			end
+
+			if hits == 0 then
+				set_status("search debug.info: not found in " .. total .. " decompiled scripts (could be Roblox / executor code, a server script, or an alias; try the call stack option)")
+				return
+			end
+
+			UI.debug_find_report("debug.info found in " .. scripts_hit .. " script(s)  [line numbers are lines of the decompiled text]", lines, hits .. " hits")
+		end)
+
+		UI.debug_find_busy = false
+		if not ok_scan then
+			set_status("search debug.info failed: " .. tostring(scan_error))
+		end
+	end)
+end
+
 do local function Info(content, String)
 	return Text(content, {Size = UDim2.new(1, 0, 0, 12), TextColor3 = T.Dim, Text = String, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y, TextTruncate = Enum.TextTruncate.None})
 end
@@ -10190,7 +10800,7 @@ UI.check_icons = {
 
 for key, icon in {
 	Animations = "anim", AnimDefaults = "anim", LogAnimations = "anim", NetFinder = "lib", Http = "http", CoreState = "corestate", Shutdowns = "shutdown", Creates = "create", InstanceNew = "instancenew",
-	GetAttributes = "getattr", SetAttributes = "setattr", AttrAntiSpam = "setattr", Sounds = "sound", Waits = "wait", Tables = "tables", Buffers = "buffers", LogService = "logservice", LogBacklog = "logservice",
+	GetAttributes = "getattr", SetAttributes = "setattr", AttrAntiSpam = "setattr", Sounds = "sound", Waits = "wait", RakNet = "raknet", RakNetReceive = "raknet", Tables = "tables", Buffers = "buffers", LogService = "logservice", LogBacklog = "logservice",
 	ParentNil = "parentnil", LogReaders = "logservice", Prompts = "prompt", InstantPrompts = "prompt", AutoPrompts = "prompt", Touches = "touch", ToolOnlyWired = "touch", TouchAll = "touch",
 	GuiClicks = "guiclick", Clicks = "click", Tools = "tool", ActorMessages = "actormsg", Actors = "actors", WatchActors = "actors",
 	BlockKicks = "kick", BlockCoreState = "corestate", BlockTeleports = "teleport", BlockShutdowns = "shutdown", BlockCreates = "create", BlockInstanceNew = "instancenew", BlockSounds = "sound",
@@ -10482,6 +11092,10 @@ end
 	end)
 
 	choice(extra, "debug.info rows", "DebugGroup", {"caller", "script", "all"})
+	check(extra, "debug.info: full call stack (shows the real call site)", "DebugStack")
+	action(extra, "find debug.info usages (running functions)", function() UI.find_debug_info() end)
+	action(extra, "find debug.info usages (decompile scripts)", function() UI.search_debug_info_source() end)
+	Info(extra, "Call stack adds every calling function (script, function name, line) to the debug.info code view, not just the guessed caller script. The two find buttons search for scripts that use debug.info without waiting for a call; results are copied to the clipboard.")
 	check(extra, "LogService:GetLogHistory (output scanning)", "LogHistory")
 	check(extra, "LocalPlayer:Kick", "Kicks")
 	UI.enable_all = function()
@@ -10512,6 +11126,9 @@ end
 	Info(extra, "Only logs calls on the picked targets. None picked = every instance.")
 	check(extra, "Sound:Play", "Sounds", function() UI.set_misc() end)
 	check(extra, "task.wait / wait", "Waits", function() UI.set_wait() end)
+	check(extra, "RakNet send hook (log outgoing packets)", "RakNet", function() UI.set_raknet() end)
+	check(extra, "RakNet receive hook (log incoming packets)", "RakNetReceive", function() UI.set_raknet() end)
+	Info(extra, "Uses raknet.add_send_hook / add_receive_hook (Potassium). Hooks only fire if RakNet hooks are also enabled in the executor's own UI settings, and the executor warns this can get you banned. Off by default. Sent packets can be sent again with run (raknet.send).")
 	check(extra, "table.* (every function: insert, remove, sort...)", "Tables", function() UI.set_lib() end)
 	check(extra, "buffer.* (every function: read / write, copy...)", "Buffers", function() UI.set_lib() end)
 	field(extra, "  max logged per frame (0 = all)", "LibRate", "60", function(String)
@@ -10622,9 +11239,9 @@ end
 
 	choice(logging, "Stack calls", "Stack", {"remote", "same args", "off"}, function() stacks = { } end)
 	check(logging, "Move stacked calls to top", "StackToTop")
-	field(logging, "History per row", "HistoryLimit", "50", function(String)
+	field(logging, "History per row", "HistoryLimit", "500", function(String)
 		local Value = tonumber(String)
-		return Value and math.clamp(math.floor(Value), 1, 1000) or nil
+		return Value and math.clamp(math.floor(Value), 1, 20000) or nil
 	end)
 
 	check(logging, "Anti spam (skip identical calls)", "AntiSpam", function() UI.spam_seen = { } UI.spam_size = 0 end)
@@ -10676,6 +11293,7 @@ end
 	choice(code, "Unpack", "Unpack", {"unpack", "table.unpack"}, function() if selected then show_details(selected) end end)
 	check(code, "Caller / actor comment", "CallerComment", redraw)
 	check(code, "debug.info of the caller", "DebugInfo", redraw)
+	check(code, "full call stack on every log (remotes, signals, etc.)", "RemoteStack", redraw)
 	check(code, "Decode buffer arguments (ByteNet)", "DecodeBuffers", redraw)
 	field(code, "  header bytes (packet id)", "BufferHeader", "1", function(String)
 		local Value = tonumber(String)
@@ -11917,6 +12535,175 @@ UI.set_wait = function()
 	end
 end
 
+shared.capture_raknet = function(direction, packet)
+	if not active or paused or replaying or shared.RakBusy then
+		return
+	end
+
+	if (direction == "send" and not Settings.RakNet) or (direction == "receive" and not Settings.RakNetReceive) then
+		return
+	end
+
+	shared.RakBusy = true
+	pcall(function()
+		local function get(Name)
+			local ok, Value = pcall(function() return packet[Name] end)
+			return ok and Value or nil
+		end
+
+		local Id = tonumber(get("PacketId")) or 0
+		local data = get("AsString")
+		data = type(data) == "string" and data or ""
+		local full = #data
+		if full > 2048 then
+			data = string.sub(data, 1, 2048)
+		end
+
+		local key = string.format("RakNet %s 0x%02X", direction, Id)
+		if ignored[key] or name_ignored(key) then
+			return
+		end
+
+		push(key, direction, "raknet", nil, false, 1, {
+			PacketId = Id,
+			Size = get("Size"),
+			Priority = get("Priority"),
+			Reliability = get("Reliability"),
+			OrderingChannel = get("OrderingChannel"),
+			Data = data,
+			Truncated = full > 2048 or nil,
+		})
+	end)
+
+	shared.RakBusy = false
+end
+
+UI.set_raknet = function()
+	if not (Settings.RakNet or Settings.RakNetReceive) then
+		return
+	end
+
+	if type(raknet) ~= "table" or type(raknet.add_send_hook) ~= "function" then
+		set_status("RakNet logging: this executor has no raknet library (Potassium)")
+		return
+	end
+
+	local function install(key, adder, direction)
+		if shared.Installed[key] then
+			return
+		end
+
+		shared.Installed[key] = pcall(adder, function(packet)
+			local capture = shared.capture_raknet
+			if capture then
+				pcall(capture, direction, packet)
+			end
+		end)
+	end
+
+	if Settings.RakNet then
+		install("RakNetSend", raknet.add_send_hook, "send")
+	end
+
+	if Settings.RakNetReceive then
+		if type(raknet.add_receive_hook) == "function" then
+			install("RakNetReceive", raknet.add_receive_hook, "receive")
+		else
+			set_status("RakNet logging: no raknet.add_receive_hook in this executor")
+			return
+		end
+	end
+
+	set_status("RakNet hooks added (also enable RakNet hooks in the executor's UI settings)")
+end
+
+UI.raknet_values = function(info)
+	local function pick(Value, default)
+		Value = tonumber(Value)
+		if Value and Value >= 0 then
+			return Value, false
+		end
+
+		return default, true
+	end
+
+	local priority, default_a = pick(info.Priority, 1)
+	local reliability, default_b = pick(info.Reliability, 0)
+	local channel, default_c = pick(info.OrderingChannel, 0)
+	return priority, reliability, channel, (default_a or default_b or default_c)
+end
+
+UI.raknet_code = function(Log)
+	local info = Log.Args and Log.Args[1]
+	if type(info) ~= "table" then
+		return "-- no packet data"
+	end
+
+	local data = type(info.Data) == "string" and info.Data or ""
+	local priority, reliability, channel, defaulted = UI.raknet_values(info)
+	local lines = {
+		"-- generated by Larp Spy",
+		"-- RakNet " .. tostring(Log.Method) .. " packet",
+		string.format("-- id: 0x%02X   size: %s   priority: %s   reliability: %s   ordering channel: %s", tonumber(info.PacketId) or 0, tostring(info.Size), tostring(info.Priority), tostring(info.Reliability), tostring(info.OrderingChannel)),
+	}
+
+	if info.Truncated then
+		table.insert(lines, "-- data was cut to the first 2048 bytes, so this can't be sent as is")
+	end
+
+	table.insert(lines, "")
+	table.insert(lines, "local data = \"\"")
+	for start = 1, #data, 32 do
+		local chunk = string.gsub(string.sub(data, start, start + 31), ".", function(char)
+			return string.format("\\x%02X", string.byte(char))
+		end)
+
+		table.insert(lines, "    .. \"" .. chunk .. "\"")
+	end
+
+	table.insert(lines, "")
+	if Log.Method == "send" and not info.Truncated then
+		if defaulted then
+			table.insert(lines, "-- the hook didn't give a valid priority / reliability / channel, so defaults are used")
+		end
+
+		table.insert(lines, string.format("raknet.send(data, %d, %d, %d)", priority, reliability, channel))
+	elseif Log.Method ~= "send" then
+		table.insert(lines, "-- received from the server, so there is nothing to send")
+	end
+
+	return table.concat(lines, "\n")
+end
+
+UI.raknet_send = function(Log)
+	local info = Log.Args and Log.Args[1]
+	if type(info) ~= "table" or type(info.Data) ~= "string" then
+		set_status("RakNet: no packet data to send")
+		return
+	end
+
+	if Log.Method ~= "send" then
+		set_status("RakNet: only sent packets can be sent again")
+		return
+	end
+
+	if info.Truncated then
+		set_status("RakNet: this packet was cut to 2048 bytes, not sending a partial packet")
+		return
+	end
+
+	if type(raknet) ~= "table" or type(raknet.send) ~= "function" then
+		set_status("RakNet: this executor has no raknet.send")
+		return
+	end
+
+	local priority, reliability, channel = UI.raknet_values(info)
+	replaying = true
+	local ok, result = pcall(raknet.send, info.Data, priority, reliability, channel)
+	replaying = false
+	set_status(ok and string.format("sent RakNet packet 0x%02X (%d bytes)", tonumber(info.PacketId) or 0, #info.Data) or ("RakNet send failed: " .. tostring(result)))
+end
+
 UI.set_misc = function()
 	local specs = {
 		{"GetAttribute", Settings.GetAttributes or Settings.BlockGetAttributes, "Folder"},
@@ -12099,6 +12886,7 @@ UI.set_instance_new()
 UI.crash.sync()
 UI.set_misc()
 UI.set_wait()
+UI.set_raknet()
 if Settings.LogService and Settings.LogBacklog then
 	task.spawn(UI.load_log_backlog)
 end
@@ -12109,6 +12897,7 @@ destroy = function()
 	shared.LibBlockOn = false
 	shared.BlockOut = { }
 	shared.capture_lib = function() end
+	shared.capture_raknet = function() end
 	pcall(UI.restore_log_readers)
 	pcall(UI.crash.cleanup)
 	for _, anim_track in UI.anim_tracks or { } do
@@ -12147,6 +12936,8 @@ env.LarpSpy = {
 	Logs = function() return logs end,
 	Block = set_blocked,
 	Ignore = set_ignored,
+	FindDebugInfo = function() UI.find_debug_info() end,
+	SearchDebugInfo = function() UI.search_debug_info_source() end,
 }
 
 Connect(game.DescendantAdded, function(object)
