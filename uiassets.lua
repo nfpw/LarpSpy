@@ -55,7 +55,7 @@ local function adonis_prompt(opts)
 
 	local box = new("CanvasGroup", {
 		Parent = gui, GroupTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, opts.has_oth and 570 or 480, 0, 132),
+		Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, opts.has_oth and 700 or 600, 0, 132),
 		BackgroundColor3 = bg, BorderSizePixel = 0, Active = true,
 	})
 
@@ -163,6 +163,32 @@ local function adonis_prompt(opts)
 		on(toggle.MouseButton1Click, function()
 			settings.UseOthHook = not settings.UseOthHook
 			draw()
+			opts.save()
+		end)
+	end
+
+	do
+		local low, low_border = make_button(0, false)
+
+		local function draw_low()
+			local enabled = settings.LowLevelExec == true
+
+			low.Text = "low level exec: " .. (enabled and "on" or "off")
+			low.TextColor3 = enabled and accent_c or light
+			low_border.Color = enabled and accent_c or edge
+		end
+
+		draw_low()
+
+		local prev = redraw_oth
+
+		redraw_oth = function() prev() draw_low() end
+
+		on(low.MouseEnter, function() fade(low, {BackgroundColor3 = quiet_hover}) end)
+		on(low.MouseLeave, function() fade(low, {BackgroundColor3 = quiet}) end)
+		on(low.MouseButton1Click, function()
+			settings.LowLevelExec = not settings.LowLevelExec
+			draw_low()
 			opts.save()
 		end)
 	end
