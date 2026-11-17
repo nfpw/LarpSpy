@@ -116,6 +116,21 @@ X.hook_function = (raw_hook or (oth and oth.hook)) and function(target, replacem
 	return old
 end
 
+X.set_identity = setthreadidentity or set_thread_identity or (syn and syn.set_thread_identity)
+X.with_identity = function(fn)
+	if not fn then return fn end
+	return function(...)
+		local low = env.__LarpLowLevel and X.set_identity
+		if low then pcall(X.set_identity, 2) end
+		local results = table.pack(pcall(fn, ...))
+		if low then pcall(X.set_identity, 8) end
+		if not results[1] then error(results[2], 0) end
+		return table.unpack(results, 2, results.n)
+	end
+end
+X.hook_function = X.with_identity(X.hook_function)
+X.hook_metamethod = X.with_identity(X.hook_metamethod)
+
 X.check_caller = checkcaller or function() return false end
 X.get_calling_script = getcallingscript or function() return nil end
 X.SetClipboard = setclipboard or toclipboard or set_clipboard
@@ -296,6 +311,7 @@ local Settings = {
 	DebugCalls = false,
 	AskAdonis = true,
 	UseOthHook = true,
+	LowLevelExec = false,
 	Accent = "Blue",
 	AccentHex = "",
 	Theme = "Auto",
@@ -432,6 +448,7 @@ if Settings.AskAdonis and not env.__LarpAdonisLoaded then
 	end
 end
 
+env.__LarpLowLevel = Settings.LowLevelExec == true
 env.__LarpUseOth = nil
 env.__LarpOthError = nil
 if Settings.UseOthHook then
@@ -1117,7 +1134,7 @@ function __R.install_connections()
 
 		local tries = {
 			function() return X.hook_function(assert(raw, "no signal __namecall"), Hook) end,
-			function() return hookmetamethod(signal, "__namecall", Hook) end,
+			function() return X.with_identity(hookmetamethod)(signal, "__namecall", Hook) end,
 			function()
 				local meta = getrawmetatable(signal)
 				if setreadonly then
@@ -1273,6 +1290,12 @@ local function install_debug_info()
 
 		shared.RawDebugInfo = old
 		raw_debug_info = old
+		pcall(function()
+			if getrenv then
+				local gd = getrenv().debug
+				if type(gd) == "table" then gd.info = old end
+			end
+		end)
 		local function probe()
 			return ((game_debug and game_debug.info or debug.info)(1, "f"))
 		end
@@ -4003,10 +4026,20 @@ function __R.serialize_table(Value, depth, seen, context)
 		return "{} --[[ too deep ]]"
 	end
 
+	do
+		local ok, mt = pcall(getrawmetatable, Value)
+		if ok and type(mt) == "table" then
+			local has = function(k) local ok2,v = pcall(rawget,mt,k) return ok2 and v ~= nil end
+			if has("__iter") and has("__index") and has("__len") then
+				return "{} --[[ table: 0x0000000000000000 ]]"
+			end
+		end
+	end
+
 	seen[Value] = true
 	local indent = string.rep("    ", depth + 1)
 	local lines = { }
-	local length = #Value
+	local length = rawlen(Value)
 	local count = 0
 	for index = 1, length do
 		count += 1
@@ -4015,7 +4048,7 @@ function __R.serialize_table(Value, depth, seen, context)
 			break
 		end
 
-		table.insert(lines, indent .. serialize(Value[index], depth + 1, seen, context) .. ",")
+		table.insert(lines, indent .. serialize(rawget(Value, index), depth + 1, seen, context) .. ",")
 	end
 
 	local keys = { }
@@ -6377,6 +6410,15 @@ serialize = function(Value, depth, seen, context)
 		return "function() end --[[ " .. ((ok and Name and Name ~= "") and Name or "function") .. " ]]"
 	end
 
+	do
+		local ok2, mt2 = pcall(getrawmetatable, Value)
+		if ok2 and type(mt2) == "table" then
+			local ok3, hasTrap = pcall(function() return rawget(mt2,"__tostring") ~= nil and rawget(mt2,"__index") ~= nil end)
+			if ok3 and hasTrap then
+				return "nil --[[ " .. Type .. ": 0x0000000000000000 ]]"
+			end
+		end
+	end
 	return "nil --[[ " .. Type .. ": " .. string.gsub(tostring(Value), "%]%]", "] ]") .. " ]]"
 end
 UI.get_nil_helper = [[local function getnil(name, class)
@@ -12653,7 +12695,7 @@ UI.set_wait = function()
 		if type(Function) == "function" and not shared.Installed[key] then
 			shared.Installed[key] = pcall(function()
 				local old
-				old = X.hook_function(Function, function(...)
+				old = X.hook_function(Function, X.new_c_closure(function(...)
 					local capture = shared.capture_wait
 					if capture and not shared.WaitBusy then
 						shared.WaitBusy = true
@@ -12667,7 +12709,7 @@ UI.set_wait = function()
 					end
 
 					return old(...)
-				end)
+				end))
 			end)
 		end
 	end
