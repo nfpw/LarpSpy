@@ -4026,16 +4026,6 @@ function __R.serialize_table(Value, depth, seen, context)
 		return "{} --[[ too deep ]]"
 	end
 
-	do
-		local ok, mt = pcall(getrawmetatable, Value)
-		if ok and type(mt) == "table" then
-			local has = function(k) local ok2,v = pcall(rawget,mt,k) return ok2 and v ~= nil end
-			if has("__iter") and has("__index") and has("__len") then
-				return "{} --[[ table: 0x0000000000000000 ]]"
-			end
-		end
-	end
-
 	seen[Value] = true
 	local indent = string.rep("    ", depth + 1)
 	local lines = { }
@@ -6410,15 +6400,6 @@ serialize = function(Value, depth, seen, context)
 		return "function() end --[[ " .. ((ok and Name and Name ~= "") and Name or "function") .. " ]]"
 	end
 
-	do
-		local ok2, mt2 = pcall(getrawmetatable, Value)
-		if ok2 and type(mt2) == "table" then
-			local ok3, hasTrap = pcall(function() return rawget(mt2,"__tostring") ~= nil and rawget(mt2,"__index") ~= nil end)
-			if ok3 and hasTrap then
-				return "nil --[[ " .. Type .. ": 0x0000000000000000 ]]"
-			end
-		end
-	end
 	return "nil --[[ " .. Type .. ": " .. string.gsub(tostring(Value), "%]%]", "] ]") .. " ]]"
 end
 UI.get_nil_helper = [[local function getnil(name, class)
